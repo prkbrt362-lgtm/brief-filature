@@ -1,0 +1,1136 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>Éditeur de brief — Filature</title>
+<meta name="theme-color" content="#080B14">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Brief">
+<link id="manifestLink" rel="manifest">
+<link id="appleIcon" rel="apple-touch-icon">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+Condensed:wght@500;600;700&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@500;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css">
+<style>
+  :root{
+    --bg:#080B14; --bg2:#0C111F; --surface:#111829; --surface2:#161F33;
+    --line:#232E47; --gold:#C6A15B; --gold-deep:#9A7328; --gold-soft:#E4C784;
+    --text:#E9ECF4; --muted:#8A93A9; --muted2:#5D6579;
+    --danger:#D0574C; --danger-bg:#2A1512; --ok:#6FBF7A; --ok-bg:#12241a; --blue:#5a8fd6;
+    --sansc:"IBM Plex Sans Condensed",system-ui,sans-serif;
+    --sans:"IBM Plex Sans",system-ui,sans-serif;
+    --mono:"IBM Plex Mono",ui-monospace,monospace;
+  }
+  *{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent}
+  html{-webkit-text-size-adjust:100%}
+  body{background:var(--bg);color:var(--text);font-family:var(--sans);font-size:16px;line-height:1.5;-webkit-font-smoothing:antialiased;padding-bottom:76px}
+  .wrap{max-width:760px;margin:0 auto}
+
+  /* top */
+  .topbar{position:sticky;top:0;z-index:800;background:rgba(8,11,20,.95);backdrop-filter:blur(8px);border-bottom:1px solid var(--line);display:flex;align-items:center;justify-content:space-between;gap:10px;padding:10px 16px}
+  .topbar .brand{font-family:var(--sansc);font-weight:700;letter-spacing:.5px;font-size:14px;color:var(--gold-soft);display:flex;align-items:center;gap:8px;min-width:0}
+  .topbar .brand svg{width:18px;height:22px;flex:0 0 auto}
+  .topbar .brand span{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .savechip{font-family:var(--mono);font-size:10px;color:var(--muted);white-space:nowrap}
+
+  /* tabs bottom */
+  .tabbar{position:fixed;left:0;right:0;bottom:0;z-index:900;background:rgba(12,17,31,.97);backdrop-filter:blur(10px);border-top:1px solid var(--line);display:flex;max-width:760px;margin:0 auto}
+  .tabbar button{flex:1;background:none;border:none;color:var(--muted);font-family:var(--sans);font-size:11px;font-weight:600;padding:9px 4px 10px;display:flex;flex-direction:column;align-items:center;gap:4px;cursor:pointer}
+  .tabbar button svg{width:22px;height:22px}
+  .tabbar button.on{color:var(--gold-soft)}
+  .tabbar button.on svg{stroke:var(--gold)}
+
+  .panel{display:none}
+  .panel.on{display:block}
+
+  /* form */
+  .grp{padding:18px 16px;border-bottom:1px solid var(--line)}
+  .grp h2{font-family:var(--sansc);font-weight:700;font-size:19px;letter-spacing:.3px;color:var(--gold-soft);margin-bottom:4px;display:flex;align-items:center;gap:9px}
+  .grp h2 .n{font-family:var(--mono);font-size:12px;color:var(--gold-deep);font-weight:600}
+  .grp .hint{font-size:12px;color:var(--muted);margin-bottom:14px}
+  label.f{display:block;margin-bottom:12px}
+  label.f .lb{font-family:var(--mono);font-size:11px;color:var(--muted);display:block;margin-bottom:5px;letter-spacing:.3px}
+  input,textarea,select{width:100%;background:var(--surface);border:1px solid var(--line);border-radius:7px;color:var(--text);font-family:var(--sans);font-size:15px;padding:10px 12px;outline:none;transition:border-color .15s}
+  input:focus,textarea:focus,select:focus{border-color:var(--gold-deep)}
+  textarea{resize:vertical;min-height:64px;line-height:1.45}
+  .row2{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+  .row3{display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px}
+  select{appearance:none;background-image:url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'><path d='M2 4l4 4 4-4' stroke='%238A93A9' stroke-width='1.5' fill='none'/></svg>");background-repeat:no-repeat;background-position:right 12px center;padding-right:32px}
+
+  /* dynamic list */
+  .dyn{display:grid;gap:8px}
+  .item{background:var(--surface);border:1px solid var(--line);border-radius:8px;padding:10px 10px 10px 12px;position:relative}
+  .item .del{position:absolute;top:8px;right:8px;width:26px;height:26px;border-radius:6px;background:var(--danger-bg);border:1px solid #4a221c;color:#f0a49b;font-size:16px;line-height:1;cursor:pointer;display:flex;align-items:center;justify-content:center}
+  .item.eq{display:grid;grid-template-columns:64px 1fr;gap:8px;padding-right:40px}
+  .item.eq .ind{}
+  .item.eq input{font-size:14px;padding:8px 10px}
+  .item .two{display:grid;grid-template-columns:1fr 1fr;gap:8px;padding-right:30px}
+  .item .one{padding-right:30px}
+  .item textarea.line{min-height:0;height:40px}
+  .addbtn{background:var(--surface2);border:1px dashed var(--gold-deep);color:var(--gold-soft);font-family:var(--sans);font-weight:600;font-size:14px;padding:11px;border-radius:8px;cursor:pointer;width:100%;display:flex;align-items:center;justify-content:center;gap:8px}
+  .addbtn:active{background:rgba(198,161,91,.1)}
+  .countbadge{margin-left:auto;font-family:var(--mono);font-size:12px;color:var(--gold);background:rgba(198,161,91,.08);border:1px solid var(--gold-deep);padding:2px 9px;border-radius:20px}
+
+  .commwarn{margin-top:12px;font-size:13px;color:var(--gold-soft);background:rgba(198,161,91,.06);border:1px solid var(--gold-deep);border-radius:8px;padding:11px 13px;display:none;gap:9px}
+  .commwarn.show{display:flex}
+  .commwarn svg{flex:0 0 auto;width:18px;height:18px;margin-top:1px}
+
+  /* CARTE */
+  #map{height:60vh;min-height:360px;width:100%;background:#0a1220;border-bottom:1px solid var(--line);z-index:1}
+  .maptools{padding:12px 14px;border-bottom:1px solid var(--line);background:var(--bg2)}
+  .search{display:flex;gap:8px;margin-bottom:12px}
+  .search input{flex:1}
+  .search button{flex:0 0 auto;background:var(--gold);color:var(--bg);border:none;border-radius:7px;font-weight:700;font-family:var(--sansc);font-size:14px;padding:0 16px;cursor:pointer}
+  .palette{display:flex;flex-wrap:wrap;gap:7px}
+  .ptool{display:flex;align-items:center;gap:7px;background:var(--surface);border:1px solid var(--line);border-radius:20px;padding:6px 12px 6px 8px;font-size:13px;font-weight:500;cursor:pointer;color:var(--text)}
+  .ptool .sw{width:14px;height:14px;border-radius:50%;flex:0 0 auto}
+  .ptool.armed{border-color:var(--gold);background:rgba(198,161,91,.12);box-shadow:0 0 0 1px var(--gold)}
+  .parm{font-family:var(--mono);font-size:12px;color:var(--gold-soft);margin-top:10px;min-height:16px}
+  .maphelp{font-size:12px;color:var(--muted);margin-top:8px;line-height:1.4}
+  .maprow{display:flex;gap:8px;margin-top:12px}
+  .maprow button{flex:1;background:var(--surface);border:1px solid var(--line);color:var(--text);border-radius:7px;font-family:var(--sans);font-weight:600;font-size:13px;padding:10px;cursor:pointer}
+  .maprow button.gen{border-color:var(--gold-deep);color:var(--gold-soft);background:rgba(198,161,91,.06)}
+
+  /* leaflet marker labels */
+  .mk-div{display:flex;align-items:center;justify-content:center;font-family:var(--mono);font-weight:700;font-size:12px;color:#fff;border:2px solid #080B14;border-radius:50%;box-shadow:0 1px 4px rgba(0,0,0,.5)}
+  .mk-lab{position:absolute;left:50%;transform:translateX(-50%);top:-20px;white-space:nowrap;font-family:var(--mono);font-size:11px;font-weight:600;background:rgba(8,11,20,.85);color:#fff;padding:1px 6px;border-radius:4px;border:1px solid var(--line);pointer-events:none}
+  .mk-sq{border-radius:4px!important}
+  .mk-star{border:none!important;box-shadow:none!important;background:none!important}
+  .sec-badge{background:var(--gold);color:var(--bg)!important;border:2px solid #080B14;border-radius:6px;font-family:var(--sansc);font-weight:700;font-size:16px}
+
+  /* APERCU (reuse maquette styling, subset) */
+  #preview{padding-bottom:20px}
+  .pv-hero{padding:30px 20px 24px;background:radial-gradient(120% 90% at 85% -10%,rgba(198,161,91,.14),transparent 60%),var(--bg2);border-bottom:1px solid var(--line)}
+  .pv-hero .kick{font-family:var(--mono);font-size:12px;color:var(--gold);letter-spacing:1px;margin-bottom:8px}
+  .pv-hero .agency{font-family:var(--sansc);font-weight:600;font-size:14px;color:var(--muted);letter-spacing:.5px;margin-bottom:6px}
+  .pv-hero h1{font-family:var(--sansc);font-weight:700;font-size:clamp(30px,8vw,46px);line-height:1;letter-spacing:.5px}
+  .pv-hero .num{color:var(--gold)}
+  .pv-hero .meta{margin-top:14px;display:flex;flex-wrap:wrap;gap:6px 20px;font-size:14px;color:var(--muted)}
+  .pv-hero .meta b{color:var(--text);font-weight:600}
+  .pv-disc{margin-top:12px;display:inline-block;font-family:var(--mono);font-size:11px;font-weight:600;color:var(--danger);border:1px solid var(--danger);padding:3px 9px;border-radius:4px}
+  .pv-block{position:relative;padding:22px 20px;border-bottom:1px solid var(--line)}
+  .pv-block::before{content:"";position:absolute;left:0;top:22px;bottom:22px;width:3px;background:linear-gradient(var(--gold),var(--gold-deep))}
+  .pv-bh{font-family:var(--sansc);font-weight:700;font-size:21px;letter-spacing:.3px;margin-bottom:13px;display:flex;align-items:baseline;gap:10px}
+  .pv-bh .n{font-family:var(--mono);font-size:12px;color:var(--gold-deep)}
+  .pv-obj{font-size:18px;line-height:1.45;font-weight:500}
+  .pv-kv{display:grid;grid-template-columns:auto 1fr;gap:5px 14px;font-size:14px;margin-top:6px}
+  .pv-kv dt{font-family:var(--mono);font-size:11px;color:var(--muted);padding-top:2px}
+  .pv-grid2{display:grid;grid-template-columns:1fr 1fr;gap:1px;background:var(--line);border:1px solid var(--line);border-radius:6px;overflow:hidden;margin-top:8px}
+  .pv-grid2>div{background:var(--surface);padding:11px 13px}
+  .pv-grid2 .l{font-family:var(--mono);font-size:11px;color:var(--muted);margin-bottom:2px}
+  .pv-warn{margin-top:12px;font-size:14px;color:var(--danger);background:var(--danger-bg);border:1px solid #4a221c;border-radius:6px;padding:11px 13px}
+  .pv-veh{margin-top:12px;background:var(--surface);border:1px solid var(--line);border-radius:6px;padding:12px 14px;font-size:14px}
+  .pv-veh .vh{font-family:var(--mono);font-size:11px;color:var(--gold);margin-bottom:7px}
+  .pv-plate{font-family:var(--mono);font-weight:600;background:#0d1830;color:#cfe0ff;border:1px solid #2a3d63;border-radius:4px;padding:2px 8px;letter-spacing:1px}
+  .pv-tl{position:relative;padding-left:20px}
+  .pv-tl::before{content:"";position:absolute;left:4px;top:6px;bottom:6px;width:1px;background:var(--line)}
+  .pv-ev{position:relative;padding-bottom:14px}
+  .pv-ev:last-child{padding-bottom:0}
+  .pv-ev::before{content:"";position:absolute;left:-19px;top:5px;width:8px;height:8px;border-radius:50%;background:var(--gold);box-shadow:0 0 0 3px var(--bg)}
+  .pv-ev .h{font-family:var(--mono);font-weight:600;color:var(--gold-soft);font-size:14px}
+  .pv-role{display:grid;grid-template-columns:auto 1fr auto;gap:11px;align-items:center;background:var(--surface);border:1px solid var(--line);border-radius:6px;padding:10px 13px;margin-bottom:7px}
+  .pv-call{font-family:var(--mono);font-weight:600;color:var(--gold-soft);background:rgba(198,161,91,.08);border:1px solid var(--gold-deep);border-radius:4px;padding:3px 8px;font-size:12px}
+  .pv-role .rn{font-weight:600;font-size:15px}
+  .pv-role .rr{font-size:13px;color:var(--muted)}
+  .pv-role .rt{font-family:var(--mono);font-size:11px;color:var(--gold);text-align:right}
+  .pv-rule{display:flex;gap:9px;font-size:14px;margin-bottom:8px}
+  .pv-rule .b{color:var(--gold);font-weight:700}
+  .pv-comm{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+  .pv-cc{background:var(--surface);border:1px solid var(--line);border-radius:6px;padding:12px 14px}
+  .pv-cc.pri{border-color:var(--gold-deep);background:rgba(198,161,91,.06)}
+  .pv-cc .cl{font-family:var(--mono);font-size:11px;color:var(--muted);margin-bottom:3px}
+  .pv-cc.pri .cl{color:var(--gold)}
+  .pv-cc .cv{font-size:15px;font-weight:600}
+  .pv-lex{margin-top:12px;background:var(--bg2);border:1px solid var(--line);border-radius:6px;overflow:hidden}
+  .pv-lex .lh{font-family:var(--mono);font-size:11px;color:var(--gold);padding:9px 13px;border-bottom:1px solid var(--line)}
+  .pv-lx{display:flex;justify-content:space-between;gap:12px;padding:8px 13px;border-bottom:1px solid var(--line);font-size:14px}
+  .pv-lx:last-child{border-bottom:none}
+  .pv-lx .c{font-family:var(--mono);font-weight:600;color:var(--gold-soft)}
+  .pv-lx .m{color:var(--muted);text-align:right}
+  .pv-urg{margin-top:10px;display:grid;grid-template-columns:1fr 1fr;gap:10px}
+  .pv-u{border-radius:6px;padding:11px 13px}
+  .pv-u.s{background:var(--danger-bg);border:1px solid #4a221c}
+  .pv-u.s .l{font-family:var(--mono);font-size:11px;color:var(--danger);margin-bottom:3px}
+  .pv-u.s .v{font-family:var(--mono);font-weight:600;font-size:16px;color:#f0a49b}
+  .pv-u.e{background:var(--ok-bg);border:1px solid #1e3a28}
+  .pv-u.e .l{font-family:var(--mono);font-size:11px;color:var(--ok);margin-bottom:3px}
+  .pv-u.e .v{font-family:var(--mono);font-weight:600;font-size:16px;color:#a7e0b0}
+  .pv-ck{display:flex;gap:10px;font-size:14px;background:var(--surface);border:1px solid var(--line);border-radius:6px;padding:10px 13px;margin-bottom:7px}
+  .pv-ck .b{color:var(--gold);font-weight:700}
+  .pv-logi{display:grid;grid-template-columns:1fr 1fr;gap:7px}
+  .pv-li{background:var(--surface);border:1px solid var(--line);border-radius:6px;padding:9px 12px;font-size:14px}
+  .pv-mapimg{position:relative;border:1px solid var(--line);border-radius:8px;overflow:hidden;background:#0a1220}
+  .pv-mapimg img{display:block;width:100%;height:auto}
+  .pv-mk{position:absolute;transform:translate(-50%,-50%);display:flex;align-items:center;justify-content:center;font-family:var(--mono);font-weight:700;font-size:11px;color:#fff;border:2px solid #080B14;border-radius:50%;width:22px;height:22px}
+  .pv-mklab{position:absolute;transform:translate(-50%,-100%);white-space:nowrap;font-family:var(--mono);font-size:10px;font-weight:600;background:rgba(8,11,20,.85);color:#fff;padding:1px 5px;border-radius:3px;border:1px solid var(--line);margin-top:-12px}
+  .pv-empty{color:var(--muted2);font-size:14px;font-style:italic}
+  .pv-legend{display:flex;flex-wrap:wrap;gap:7px 12px;margin-top:10px;font-size:12px;color:var(--muted)}
+  .pv-legend span{display:flex;align-items:center;gap:6px}
+  .pv-legend i{width:12px;height:12px;border-radius:50%;display:inline-block}
+  .pv-sec{display:flex;gap:11px;align-items:center;background:var(--surface);border:1px solid var(--line);border-left:3px solid var(--gold);border-radius:6px;padding:9px 12px;margin-top:7px}
+  .pv-sec .sb{font-family:var(--sansc);font-weight:700;font-size:17px;color:var(--bg);background:var(--gold);width:28px;height:28px;border-radius:5px;display:flex;align-items:center;justify-content:center}
+
+  /* ENVOYER */
+  .send{padding:20px 16px}
+  .send .lead{font-size:15px;color:var(--muted);margin-bottom:18px;line-height:1.5}
+  .bigbtn{width:100%;border:none;border-radius:10px;font-family:var(--sansc);font-weight:700;font-size:17px;letter-spacing:.3px;padding:16px;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:10px;margin-bottom:11px}
+  .bigbtn svg{width:22px;height:22px}
+  .bigbtn.signal{background:#3a76f0;color:#fff}
+  .bigbtn.copy{background:var(--surface2);color:var(--text);border:1px solid var(--line)}
+  .bigbtn.pdf{background:var(--gold);color:var(--bg)}
+  .bigbtn.map{background:var(--surface);color:var(--gold-soft);border:1px solid var(--gold-deep)}
+  .bigbtn.install{background:var(--ok);color:#04140a}
+  .bigbtn.present{background:var(--gold-soft);color:#04140a}
+  .bigbtn.resetbig{background:var(--danger-bg);color:#f0a49b;border:1px solid #4a221c}
+  .sendhead{font-family:var(--mono);font-size:11px;letter-spacing:1px;color:var(--gold);margin:22px 0 10px;padding-top:16px;border-top:1px solid var(--line)}
+  .sendhead:first-of-type{border-top:none;padding-top:0;margin-top:16px}
+
+  /* mode présentation plein écran */
+  #present{position:fixed;inset:0;z-index:2000;background:var(--bg);display:none;flex-direction:column}
+  #present.on{display:flex}
+  .pr-stage{flex:1;overflow-y:auto;display:flex;flex-direction:column;justify-content:center;padding:40px 30px}
+  .pr-slide{display:none;max-width:920px;margin:0 auto;width:100%}
+  .pr-slide.on{display:block;animation:prIn .25s ease}
+  @keyframes prIn{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:none}}
+  #present .pv-block,#present .pv-hero{border:none!important;padding:0}
+  #present .pv-block::before{display:none}
+  #present .pv-hero h1{font-size:clamp(44px,9vw,76px)}
+  #present .pv-hero .kick{font-size:15px}
+  #present .pv-hero .meta{font-size:18px;gap:8px 28px}
+  #present .pv-disc{font-size:14px;margin-top:18px}
+  #present .pv-bh{font-size:clamp(26px,5vw,36px);margin-bottom:22px}
+  #present .pv-obj{font-size:clamp(20px,3.4vw,27px)}
+  #present .pv-kv{font-size:17px;gap:8px 18px}
+  #present .pv-grid2 .l,#present .pv-cc .cl,#present .pv-lex .lh{font-size:13px}
+  #present .pv-grid2>div{padding:16px 18px;font-size:18px}
+  #present .pv-role .rn,#present .pv-cc .cv{font-size:19px}
+  #present .pv-role .rr{font-size:15px}
+  #present .pv-call{font-size:15px}
+  #present .pv-rule,#present .pv-ck,#present .pv-li,#present .pv-ev{font-size:17px}
+  #present .pv-ev .h{font-size:17px}
+  #present .pv-lx{font-size:17px;padding:11px 16px}
+  #present .pv-u .v{font-size:21px}
+  #present .pv-mapimg{max-height:60vh}
+  #present .pv-mapimg img{max-height:60vh;width:auto;max-width:100%;margin:0 auto}
+  .pr-bar{display:flex;align-items:center;gap:14px;padding:12px 16px;border-top:1px solid var(--line);background:var(--bg2)}
+  .pr-bar button{background:var(--surface);border:1px solid var(--line);color:var(--text);border-radius:8px;font-size:22px;line-height:1;width:52px;height:46px;cursor:pointer}
+  .pr-bar button:disabled{opacity:.35}
+  .pr-count{font-family:var(--mono);font-size:14px;color:var(--muted);flex:1;text-align:center}
+  .pr-exit{margin-left:auto;background:var(--danger-bg)!important;border-color:#4a221c!important;color:#f0a49b!important;width:auto!important;padding:0 16px;font-size:14px!important;font-family:var(--sans)}
+  .pr-tap{position:absolute;top:0;bottom:64px;width:30%;z-index:2001}
+  .pr-tap.l{left:0}.pr-tap.r{right:0}
+  .sendnote{font-size:13px;color:var(--muted);background:var(--bg2);border:1px solid var(--line);border-radius:8px;padding:13px 15px;margin-top:8px;line-height:1.5}
+  .sendnote b{color:var(--gold-soft)}
+  .toast{position:fixed;bottom:88px;left:50%;transform:translateX(-50%);background:var(--ok-bg);border:1px solid #1e3a28;color:#a7e0b0;font-size:14px;padding:10px 18px;border-radius:8px;z-index:1000;opacity:0;transition:opacity .2s;pointer-events:none}
+  .toast.show{opacity:1}
+  .danger-txt{color:var(--danger)}
+  .reset{background:none;border:1px solid var(--line);color:var(--muted);border-radius:7px;padding:9px 14px;font-size:13px;cursor:pointer;margin-top:20px;width:100%}
+
+  @media(max-width:460px){
+    .row2,.row3,.pv-grid2,.pv-comm,.pv-urg,.pv-logi{grid-template-columns:1fr}
+    .item .two{grid-template-columns:1fr}
+  }
+  @media(prefers-reduced-motion:reduce){*{transition:none!important;animation:none!important}}
+
+  /* PRINT */
+  @media print{
+    body{padding:0;background:#080B14}
+    .topbar,.tabbar,.toast{display:none!important}
+    .panel{display:none!important}
+    #tab-apercu{display:block!important}
+    .pv-block,.pv-hero{break-inside:avoid}
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <div class="topbar">
+    <div class="brand">
+      <svg viewBox="0 0 20 24" fill="none"><path d="M10 1 L18 4 V11 C18 17 14 21 10 23 C6 21 2 17 2 11 V4 Z" stroke="#C6A15B" stroke-width="1.5" fill="rgba(198,161,91,.08)"/></svg>
+      <span id="brandName">BRIEF DE FILATURE</span>
+    </div>
+    <div class="savechip" id="saveChip">enregistré</div>
+  </div>
+
+  <!-- ============ ÉDITER ============ -->
+  <div class="panel on" id="tab-editer">
+
+    <div class="grp">
+      <h2><span class="n">00</span>EN-TÊTE</h2>
+      <div class="hint">Date et chef de mission. Discrétion maximale par défaut sur tous les briefs.</div>
+      <div class="row2">
+        <label class="f"><span class="lb">DATE</span><input id="f_date" placeholder="Ex. Jeu. 24 sept."></label>
+        <label class="f"><span class="lb">CHEF DE MISSION</span><input id="f_chef" placeholder="Prénom / nom"></label>
+      </div>
+    </div>
+
+    <div class="grp">
+      <h2><span class="n">01</span>QUOI — Objectif</h2>
+      <label class="f"><span class="lb">OBJECTIF DE LA MISSION</span><textarea id="f_objectif" placeholder="Ce qu'on cherche à établir, en une ou deux phrases."></textarea></label>
+      <div class="row2">
+        <label class="f"><span class="lb">LIVRABLE ATTENDU</span><input id="f_livrable" placeholder="Ex. chronologie + photos"></label>
+        <label class="f"><span class="lb">PRIORITÉ</span><input id="f_priorite" placeholder="Ex. rencontres, lieux"></label>
+      </div>
+      <label class="f"><span class="lb">PÉRIMÈTRE</span><input id="f_perimetre" placeholder="Ex. voie publique"></label>
+    </div>
+
+    <div class="grp">
+      <h2><span class="n">02</span>QUI — Cible</h2>
+      <div class="row2">
+        <label class="f"><span class="lb">IDENTITÉ / DÉSIGNATION</span><input id="f_cible" placeholder="Ex. Laurent V."></label>
+        <label class="f"><span class="lb">DESCRIPTION</span><input id="f_cibledesc" placeholder="Ex. H, ~45 ans, 1,80 m"></label>
+      </div>
+      <label class="f"><span class="lb">SIGNES DISTINCTIFS</span><input id="f_signes" placeholder="Vêtements, barbe, lunettes…"></label>
+      <div class="row2">
+        <label class="f"><span class="lb">DOMICILE / POINT DE DÉPART</span><input id="f_domicile" placeholder="Adresse ou réf. secteur"></label>
+        <label class="f"><span class="lb">HABITUDES CONNUES</span><input id="f_habitudes" placeholder="Horaires, trajets…"></label>
+      </div>
+      <label class="f"><span class="lb">PERSONNES ASSOCIÉES</span><input id="f_associes" placeholder="Entourage, contacts récurrents"></label>
+      <div class="row2">
+        <label class="f"><span class="lb">VÉHICULE (modèle/couleur)</span><input id="f_veh" placeholder="Ex. Audi A4 gris"></label>
+        <label class="f"><span class="lb">PLAQUE</span><input id="f_plaque" placeholder="AA-000-AA"></label>
+      </div>
+      <label class="f"><span class="lb">VÉHICULE — SIGNES PARTICULIERS</span><input id="f_vehsignes" placeholder="Autocollant, jantes, choc…"></label>
+      <label class="f"><span class="lb">MÉFIANCE / VIGILANCE PARTICULIÈRE</span><textarea id="f_mefiance" placeholder="Laisser vide si rien à signaler. Ex. change souvent d'itinéraire."></textarea></label>
+    </div>
+
+    <div class="grp">
+      <h2><span class="n">03</span>QUAND — Timing<span class="countbadge" id="tlCount">0</span></h2>
+      <div class="hint">Étapes horaires de la mission. Ajoute autant de lignes que nécessaire.</div>
+      <div class="dyn" id="tlList"></div>
+      <button class="addbtn" id="addTl">+ Ajouter une étape</button>
+    </div>
+
+    <div class="grp">
+      <h2><span class="n">04</span>OÙ</h2>
+      <div class="hint">La carte se prépare dans l'onglet <b>Carte</b> : place tes équipiers, la cible et les secteurs sur la photo satellite. Ajoute ici les secteurs pour la légende.</div>
+      <div class="dyn" id="secList"></div>
+      <button class="addbtn" id="addSec">+ Ajouter un secteur</button>
+    </div>
+
+    <div class="grp">
+      <h2><span class="n">05</span>COMMENT — Dispositif<span class="countbadge" id="eqCount">0 enq.</span></h2>
+      <div class="hint">Un équipier par ligne. Le <b>prénom</b> est ce que tout le monde lit ; l'<b>indicatif</b> (A1, VB…) relie au pion sur la carte.</div>
+      <div class="dyn" id="eqList"></div>
+      <button class="addbtn" id="addEq">+ Ajouter un équipier</button>
+      <div style="margin-top:16px"><div class="hint" style="margin-bottom:8px">RÈGLES DU DISPOSITIF (distance, relais, décrochage…)</div>
+        <div class="dyn" id="ruleList"></div>
+        <button class="addbtn" id="addRule">+ Ajouter une règle</button>
+      </div>
+    </div>
+
+    <div class="grp">
+      <h2><span class="n">06</span>COMMUNICATION</h2>
+      <div class="row2">
+        <label class="f"><span class="lb">CANAL PRINCIPAL</span><input id="f_comm1" placeholder="Ex. Signal, appel de groupe"></label>
+        <label class="f"><span class="lb">CANAL DE SECOURS</span><input id="f_comm2" placeholder="Ex. conférence téléphonique"></label>
+      </div>
+      <div class="commwarn" id="commWarn">
+        <svg viewBox="0 0 24 24" fill="none"><path d="M12 3 L22 20 H2 Z" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/><path d="M12 9 V14 M12 17 h.01" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg>
+        <span id="commWarnTxt"></span>
+      </div>
+      <div style="margin-top:14px"><div class="hint" style="margin-bottom:8px">LEXIQUE RADIO (code → signification)</div>
+        <div class="dyn" id="lexList"></div>
+        <button class="addbtn" id="addLex">+ Ajouter un code</button>
+      </div>
+      <label class="f" style="margin-top:14px"><span class="lb">CODE URGENCE / DANGER</span><input id="f_urgence" placeholder="Ex. « CODE ROUGE + position »"></label>
+    </div>
+
+    <div class="grp">
+      <h2><span class="n">07</span>SÉCURITÉ — Conduite à tenir</h2>
+      <div class="hint">Consignes de sécurité, une par ligne.</div>
+      <div class="dyn" id="secuList"></div>
+      <button class="addbtn" id="addSecu">+ Ajouter une consigne</button>
+    </div>
+
+    <div class="grp" style="border-bottom:none">
+      <h2><span class="n">08</span>LOGISTIQUE</h2>
+      <div class="hint">Matériel et préparatifs, un par ligne.</div>
+      <div class="dyn" id="logiList"></div>
+      <button class="addbtn" id="addLogi">+ Ajouter un élément</button>
+      <button class="reset" id="resetBtn">Réinitialiser le brief (tout effacer)</button>
+    </div>
+  </div>
+
+  <!-- ============ CARTE ============ -->
+  <div class="panel" id="tab-carte">
+    <div class="maptools">
+      <div class="search">
+        <input id="geoInput" placeholder="Chercher une adresse, une ville…" enterkeyhint="search">
+        <button id="geoBtn">Aller</button>
+      </div>
+      <div class="palette" id="palette">
+        <div class="ptool" data-type="cible"><span class="sw" style="background:#D0574C"></span>Cible</div>
+        <div class="ptool" data-type="vehcible"><span class="sw mk-sq" style="background:#D0574C;border-radius:3px"></span>Véh. cible</div>
+        <div class="ptool" data-type="enq"><span class="sw" style="background:#C6A15B"></span>Enquêteur</div>
+        <div class="ptool" data-type="vehequipe"><span class="sw mk-sq" style="background:#5a8fd6;border-radius:3px"></span>Véh. équipe</div>
+        <div class="ptool" data-type="rv"><span class="sw" style="background:#6FBF7A"></span>Point RV</div>
+        <div class="ptool" data-type="repli"><span class="sw" style="background:#6FBF7A;border-radius:3px"></span>Repli</div>
+        <div class="ptool" data-type="secteur"><span class="sw" style="background:#C6A15B;border-radius:3px"></span>Secteur</div>
+      </div>
+      <div class="parm" id="paletteMsg">Touche un type puis touche la carte pour le poser.</div>
+      <div class="maphelp">Fais glisser un pion pour le déplacer · touche-le pour le renommer ou le supprimer.</div>
+      <div class="maprow">
+        <button class="gen" id="genMap">Figer la carte pour le brief</button>
+        <button id="clearMap">Tout effacer</button>
+      </div>
+      <div class="maphelp" id="genMsg" style="margin-top:8px"></div>
+    </div>
+    <div id="map"></div>
+  </div>
+
+  <!-- ============ APERÇU ============ -->
+  <div class="panel" id="tab-apercu">
+    <div id="preview"></div>
+  </div>
+
+  <!-- ============ ENVOYER ============ -->
+  <div class="panel" id="tab-envoyer">
+    <div class="send">
+      <button class="bigbtn install" id="btnInstall">
+        <svg viewBox="0 0 24 24" fill="none"><path d="M12 3 v11 M8 11 l4 4 4-4" stroke="#04140a" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/><path d="M5 20 h14" stroke="#04140a" stroke-width="1.8" stroke-linecap="round"/></svg>
+        Installer sur l'écran d'accueil
+      </button>
+
+      <div class="sendhead">PRÉSENTER (sans diffuser)</div>
+      <button class="bigbtn present" id="btnPresent">
+        <svg viewBox="0 0 24 24" fill="none"><rect x="3" y="4" width="18" height="12" rx="1.5" stroke="#04140a" stroke-width="1.7"/><path d="M12 16 v3 M8 21 h8" stroke="#04140a" stroke-width="1.7" stroke-linecap="round"/></svg>
+        Mode présentation (vidéoprojecteur)
+      </button>
+      <div class="sendnote" style="margin-bottom:4px">Affiche le brief en plein écran, une partie par écran. Rien n'est envoyé. Branche le téléphone ou l'ordi au projecteur et fais défiler.</div>
+
+      <div class="sendhead">DIFFUSER</div>
+      <div class="lead">Le partage ouvre le sélecteur de ton téléphone — choisis <b>Signal</b>.</div>
+      <button class="bigbtn signal" id="btnShare">
+        <svg viewBox="0 0 24 24" fill="none"><path d="M4 12 a8 8 0 1 1 4 6.9 L4 20 l1.1-4 A8 8 0 0 1 4 12 Z" stroke="#fff" stroke-width="1.6" stroke-linejoin="round"/></svg>
+        Partager le brief (Signal…)
+      </button>
+      <button class="bigbtn copy" id="btnCopy">
+        <svg viewBox="0 0 24 24" fill="none"><rect x="8" y="8" width="12" height="13" rx="2" stroke="currentColor" stroke-width="1.6"/><path d="M16 8 V6 a2 2 0 0 0-2-2 H6 a2 2 0 0 0-2 2 v10 a2 2 0 0 0 2 2 h2" stroke="currentColor" stroke-width="1.6"/></svg>
+        Copier le texte du brief
+      </button>
+      <button class="bigbtn pdf" id="btnPdf">
+        <svg viewBox="0 0 24 24" fill="none"><path d="M7 3 h7 l5 5 v13 a1 1 0 0 1-1 1 H7 a1 1 0 0 1-1-1 V4 a1 1 0 0 1 1-1 Z" stroke="#080B14" stroke-width="1.6"/><path d="M14 3 v5 h5" stroke="#080B14" stroke-width="1.6"/></svg>
+        Exporter en PDF (imprimer → PDF)
+      </button>
+      <button class="bigbtn map" id="btnMapImg">
+        <svg viewBox="0 0 24 24" fill="none"><path d="M4 7 l5-2 6 2 5-2 v14 l-5 2 -6-2 -5 2 Z" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/><path d="M9 5 v14 M15 7 v14" stroke="currentColor" stroke-width="1.3"/></svg>
+        Voir / enregistrer l'image de la carte
+      </button>
+      <div class="sendnote">
+        <b>Sécurité du brief.</b> Il contient des données personnelles (photo, adresse, plaque).
+        Envoie-le sur <b>Signal en messages éphémères</b>, demande la <b>suppression en fin de mission</b>,
+        et évite WhatsApp qui laisse des copies dans les galeries.<br><br>
+        <b>Carte :</b> « Figer la carte » dans l'onglet Carte (sur le fond choisi — satellite ou Plan IGN). Le partage joint alors la carte annotée en image.
+        <b>Pour une copie complète et garantie (texte + carte en un seul fichier), utilise l'export PDF</b> — certains messageries tronquent les longs textes.
+      </div>
+
+      <div class="sendhead">NOUVELLE MISSION</div>
+      <button class="bigbtn resetbig" id="btnResetSend">
+        <svg viewBox="0 0 24 24" fill="none"><path d="M20 11 a8 8 0 1 0-.6 4" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/><path d="M20 4 v5 h-5" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/></svg>
+        Reset briefing (tout effacer)
+      </button>
+      <div class="sendnote" style="margin-top:4px">Efface <b>tout</b> le brief (champs, dispositif, lexique, carte et pions) pour repartir à zéro sur une nouvelle mission. Irréversible.</div>
+    </div>
+  </div>
+
+</div>
+<div class="toast" id="toast"></div>
+
+<!-- tabs -->
+<div class="tabbar">
+  <button class="on" data-tab="editer"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M4 20 h16 M6 16 l9-9 3 3 -9 9 H6 Z"/></svg>Éditer</button>
+  <button data-tab="carte"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M4 6 l5-2 6 2 5-2 v14 l-5 2 -6-2 -5 2 Z" stroke-linejoin="round"/><path d="M9 4 v14 M15 6 v14"/></svg>Carte</button>
+  <button data-tab="apercu"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M2 12 s3.5-7 10-7 10 7 10 7 -3.5 7-10 7 -10-7-10-7 Z"/><circle cx="12" cy="12" r="3"/></svg>Aperçu</button>
+  <button data-tab="envoyer"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M4 11 L20 4 L14 20 L11 13 Z" stroke-linejoin="round"/></svg>Envoyer</button>
+</div>
+
+<!-- mode présentation -->
+<div id="present">
+  <div class="pr-tap l" id="prPrevZone"></div>
+  <div class="pr-tap r" id="prNextZone"></div>
+  <div class="pr-stage" id="prStage"></div>
+  <div class="pr-bar">
+    <button id="prPrev">‹</button>
+    <button id="prNext">›</button>
+    <div class="pr-count" id="prCount">1 / 1</div>
+    <button class="pr-exit" id="prExit">Quitter</button>
+  </div>
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
+<script>
+(function(){
+"use strict";
+var $=function(id){return document.getElementById(id);};
+var esc=function(s){return (s==null?'':String(s)).replace(/[&<>"]/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c];});};
+
+/* ---------- STATE ---------- */
+var KEY='brief_filature_v1';
+var DEF={
+  date:'',chef:'',disc:'Discrétion maximale',
+  objectif:'',livrable:'',priorite:'',perimetre:'',
+  cible:'',cibledesc:'',signes:'',domicile:'',habitudes:'',associes:'',veh:'',plaque:'',vehsignes:'',mefiance:'',
+  tl:[], sec:[], eq:[], rule:[],
+  comm1:'',comm2:'', lex:[], urgence:'',
+  secu:[], logi:[],
+  map:{center:[48.8566,2.3522],zoom:13,markers:[],sectors:[],layer:'ignsat'},
+  mapimg:null
+};
+var S;
+try{ S=JSON.parse(localStorage.getItem(KEY))||null; }catch(e){ S=null; }
+if(!S){ S=JSON.parse(JSON.stringify(DEF)); seed(); }
+// ensure arrays exist
+['tl','sec','eq','rule','lex','secu','logi'].forEach(function(k){ if(!Array.isArray(S[k])) S[k]=[]; });
+if(!S.map) S.map=JSON.parse(JSON.stringify(DEF.map));
+
+function seed(){
+  S.comm1='Signal — appel de groupe'; S.comm2='Conférence téléphonique';
+  S.urgence='« CODE ROUGE + position »';
+  S.lex=[
+    {c:'« Contact »',m:'Cible en vue'},
+    {c:'« Ça bouge »',m:'La cible se déplace'},
+    {c:'« Je l\'ai »',m:'Je tiens le contact visuel'},
+    {c:'« Perdu »',m:'Contact visuel perdu'},
+    {c:'« Brûlé »',m:'Je suis repéré, je décroche'},
+    {c:'« Je passe la main »',m:'Relais demandé'}
+  ];
+  S.rule=[
+    'Distance : ne jamais rester seul dans le champ de vision de la cible.',
+    'Relais dès qu\'un équipier se sent repéré.',
+    'Tout équipier « brûlé » décroche et rejoint le repli.',
+    'Photo : jamais au flash, jamais dans un lieu privé.'
+  ];
+  S.secu=[
+    'Contrôle de police : présenter carte pro + ordre de mission.',
+    'Aucun contact avec la cible.',
+    'Au volant : aucun risque, perdre la cible plutôt qu\'un accident.'
+  ];
+  S.logi=['Plein de carburant','Batteries + power bank','Matériel photo','Tenue de change','Eau / casse-croûte','Carte pro à jour'];
+}
+
+var saveT;
+function save(){
+  try{ localStorage.setItem(KEY,JSON.stringify(S)); }catch(e){}
+  var c=$('saveChip'); c.textContent='enregistré ✓';
+  clearTimeout(saveT); saveT=setTimeout(function(){c.textContent='enregistré';},1200);
+}
+
+/* ---------- TOP + SIMPLE FIELDS ---------- */
+var simple=['date','chef','objectif','livrable','priorite','perimetre',
+  'cible','cibledesc','signes','domicile','habitudes','associes','veh','plaque','vehsignes','mefiance',
+  'comm1','comm2','urgence'];
+var map={date:'f_date',chef:'f_chef',objectif:'f_objectif',
+  livrable:'f_livrable',priorite:'f_priorite',perimetre:'f_perimetre',cible:'f_cible',
+  cibledesc:'f_cibledesc',signes:'f_signes',domicile:'f_domicile',habitudes:'f_habitudes',associes:'f_associes',
+  veh:'f_veh',plaque:'f_plaque',vehsignes:'f_vehsignes',mefiance:'f_mefiance',comm1:'f_comm1',comm2:'f_comm2',
+  urgence:'f_urgence'};
+simple.forEach(function(k){
+  var el=$(map[k]); if(!el)return;
+  el.value=S[k]||'';
+  el.addEventListener('input',function(){ S[k]=el.value; save(); });
+});
+S.disc='Discrétion maximale';
+function updateBrand(){ $('brandName').textContent='BRIEF DE FILATURE'; buildPWA(); }
+
+/* ---------- PWA : icône blason + manifest générés à la volée ---------- */
+function drawShield(x,cx,cy,w,h,gold,fill,lw){
+  var top=cy-h/2, bot=cy+h/2, l=cx-w/2, r=cx+w/2;
+  x.beginPath();
+  x.moveTo(cx,top);
+  x.lineTo(r,top+h*0.15);
+  x.lineTo(r,top+h*0.52);
+  x.quadraticCurveTo(r,bot-h*0.06,cx,bot);
+  x.quadraticCurveTo(l,bot-h*0.06,l,top+h*0.52);
+  x.lineTo(l,top+h*0.15);
+  x.closePath();
+  if(fill){x.fillStyle=fill;x.fill();}
+  x.strokeStyle=gold;x.lineWidth=lw;x.lineJoin='round';x.stroke();
+}
+function makeIcon(size){
+  var c=document.createElement('canvas');c.width=c.height=size;var x=c.getContext('2d');
+  var g=x.createLinearGradient(0,0,size,size);g.addColorStop(0,'#0C1424');g.addColorStop(1,'#080B14');
+  x.fillStyle=g;x.fillRect(0,0,size,size);
+  var cx=size/2, cy=size/2, w=size*0.46, h=size*0.58;
+  drawShield(x,cx,cy,w,h,'#C6A15B','rgba(198,161,91,0.10)',Math.max(2,size*0.02));
+  // arc + trait interne (écho du blason)
+  x.strokeStyle='#C6A15B';x.lineWidth=Math.max(2,size*0.016);x.lineCap='round';
+  x.beginPath();x.moveTo(cx,cy-h*0.14);x.lineTo(cx,cy+h*0.16);x.stroke();
+  x.beginPath();x.arc(cx,cy-h*0.02,w*0.26,Math.PI*1.15,Math.PI*1.85);x.stroke();
+  return c.toDataURL('image/png');
+}
+var _pwaBuilt=false, _pwaBlob=null;
+function buildPWA(){
+  try{
+    var name='Brief de filature';
+    var i192=makeIcon(192), i512=makeIcon(512);
+    var base=location.href.split('#')[0].split('?')[0];
+    var scope=base.replace(/[^/]*$/,'');
+    var man={
+      name:name+' — Brief', short_name:'Brief',
+      start_url:base, scope:scope,
+      display:'standalone', orientation:'portrait',
+      background_color:'#080B14', theme_color:'#080B14',
+      icons:[
+        {src:i192,sizes:'192x192',type:'image/png',purpose:'any maskable'},
+        {src:i512,sizes:'512x512',type:'image/png',purpose:'any maskable'}
+      ]
+    };
+    if(_pwaBlob) URL.revokeObjectURL(_pwaBlob);
+    _pwaBlob=URL.createObjectURL(new Blob([JSON.stringify(man)],{type:'application/manifest+json'}));
+    $('manifestLink').setAttribute('href',_pwaBlob);
+    $('appleIcon').setAttribute('href',i192);
+    _pwaBuilt=true;
+  }catch(e){}
+}
+var _deferredPrompt=null;
+window.addEventListener('beforeinstallprompt',function(e){ e.preventDefault(); _deferredPrompt=e; });
+window.addEventListener('appinstalled',function(){ toast('Application installée ✓'); });
+$('btnInstall').onclick=function(){
+  if(_deferredPrompt){ _deferredPrompt.prompt(); _deferredPrompt.userChoice.finally(function(){_deferredPrompt=null;}); }
+  else if(window.matchMedia&&window.matchMedia('(display-mode: standalone)').matches){ toast('Déjà installée ✓'); }
+  else {
+    var ios=/iphone|ipad|ipod/i.test(navigator.userAgent);
+    alert(ios
+      ? 'Sur iPhone : bouton Partager (carré avec flèche) → « Sur l\'écran d\'accueil ».'
+      : 'Sur Android : menu ⋮ de Chrome (en haut à droite) → « Ajouter à l\'écran d\'accueil » ou « Installer l\'application ».\n\n(Le fichier doit être ouvert depuis une adresse https, pas depuis les téléchargements.)');
+  }
+};
+
+updateBrand();
+
+/* ---------- DYNAMIC LISTS ---------- */
+function delBtn(onclick){ var b=document.createElement('button'); b.className='del'; b.innerHTML='&times;'; b.onclick=onclick; return b; }
+
+// timeline
+function renderTl(){
+  var box=$('tlList'); box.innerHTML='';
+  S.tl.forEach(function(it,i){
+    var d=document.createElement('div'); d.className='item';
+    d.innerHTML='<div class="two"><input placeholder="Heure (ex. 08 h 15)" value="'+esc(it.h)+'"><input placeholder="Détail (ex. sortie cible)" value="'+esc(it.d)+'"></div>';
+    var ins=d.querySelectorAll('input');
+    ins[0].oninput=function(){it.h=ins[0].value;save();};
+    ins[1].oninput=function(){it.d=ins[1].value;save();};
+    d.appendChild(delBtn(function(){S.tl.splice(i,1);renderTl();save();}));
+    box.appendChild(d);
+  });
+  $('tlCount').textContent=S.tl.length;
+}
+$('addTl').onclick=function(){S.tl.push({h:'',d:''});renderTl();save();};
+
+// secteurs (liste légende)
+function renderSec(){
+  var box=$('secList'); box.innerHTML='';
+  S.sec.forEach(function(it,i){
+    var d=document.createElement('div'); d.className='item eq';
+    d.innerHTML='<input class="ind" placeholder="A" value="'+esc(it.l)+'"><input placeholder="Description (ex. domicile & rue des Lilas)" value="'+esc(it.d)+'">';
+    var ins=d.querySelectorAll('input');
+    ins[0].oninput=function(){it.l=ins[0].value;save();};
+    ins[1].oninput=function(){it.d=ins[1].value;save();};
+    d.appendChild(delBtn(function(){S.sec.splice(i,1);renderSec();save();}));
+    box.appendChild(d);
+  });
+}
+$('addSec').onclick=function(){S.sec.push({l:'',d:''});renderSec();save();};
+
+// équipe
+function renderEq(){
+  var box=$('eqList'); box.innerHTML='';
+  S.eq.forEach(function(it,i){
+    var d=document.createElement('div'); d.className='item';
+    d.innerHTML=''+
+      '<div style="display:grid;grid-template-columns:70px 1fr;gap:8px;padding-right:30px">'+
+        '<input placeholder="A1" value="'+esc(it.ind)+'">'+
+        '<input placeholder="Prénom" value="'+esc(it.nom)+'">'+
+      '</div>'+
+      '<div class="two" style="margin-top:8px"><input placeholder="Rôle (ex. contact visuel)" value="'+esc(it.role)+'"><input placeholder="Secteur (ex. A)" value="'+esc(it.secteur)+'"></div>';
+    var ins=d.querySelectorAll('input');
+    ins[0].oninput=function(){it.ind=ins[0].value;save();};
+    ins[1].oninput=function(){it.nom=ins[1].value;save();};
+    ins[2].oninput=function(){it.role=ins[2].value;save();};
+    ins[3].oninput=function(){it.secteur=ins[3].value;save();};
+    d.appendChild(delBtn(function(){S.eq.splice(i,1);renderEq();updateComm();save();}));
+    box.appendChild(d);
+  });
+  $('eqCount').textContent=S.eq.length+' enq.';
+  updateComm();
+}
+$('addEq').onclick=function(){S.eq.push({ind:'',nom:'',role:'',secteur:''});renderEq();save();};
+
+// simple text list factory
+function textList(arr,boxId,addId,ph){
+  function render(){
+    var box=$(boxId); box.innerHTML='';
+    arr.forEach(function(v,i){
+      var d=document.createElement('div'); d.className='item';
+      d.innerHTML='<div class="one"><textarea class="line" placeholder="'+esc(ph)+'">'+esc(v)+'</textarea></div>';
+      var ta=d.querySelector('textarea');
+      ta.oninput=function(){arr[i]=ta.value;save();};
+      d.appendChild(delBtn(function(){arr.splice(i,1);render();save();}));
+      box.appendChild(d);
+    });
+  }
+  $(addId).onclick=function(){arr.push('');render();save();
+    var box=$(boxId); var tas=box.querySelectorAll('textarea'); if(tas.length)tas[tas.length-1].focus();};
+  render();
+  return render;
+}
+textList(S.rule,'ruleList','addRule','Règle du dispositif…');
+textList(S.secu,'secuList','addSecu','Consigne de sécurité…');
+textList(S.logi,'logiList','addLogi','Élément de logistique…');
+
+// lexique
+function renderLex(){
+  var box=$('lexList'); box.innerHTML='';
+  S.lex.forEach(function(it,i){
+    var d=document.createElement('div'); d.className='item eq';
+    d.innerHTML='<input class="ind" style="width:auto" placeholder="« Code »" value="'+esc(it.c)+'"><input placeholder="Signification" value="'+esc(it.m)+'">';
+    var ins=d.querySelectorAll('input');
+    ins[0].oninput=function(){it.c=ins[0].value;save();};
+    ins[1].oninput=function(){it.m=ins[1].value;save();};
+    d.appendChild(delBtn(function(){S.lex.splice(i,1);renderLex();save();}));
+    box.appendChild(d);
+  });
+}
+$('addLex').onclick=function(){S.lex.push({c:'',m:''});renderLex();save();};
+
+// comm warning by effectif
+function updateComm(){
+  var n=S.eq.length, w=$('commWarn'), t=$('commWarnTxt');
+  if(n>30){ w.classList.add('show'); t.textContent='Effectif '+n+' : WhatsApp exclu (max 32 en appel). Signal tient jusqu\'à 75. Découpe en cellules par secteur, un canal par cellule + un canal commandement — un canal unique devient inaudible.'; }
+  else if(n>=8){ w.classList.add('show'); t.textContent='Effectif '+n+' : pense à un canal par secteur + un canal commandement pour rester audible.'; }
+  else { w.classList.remove('show'); }
+}
+
+renderTl();renderSec();renderEq();renderLex();updateComm();
+
+function doReset(){
+  if(confirm('Tout effacer (champs, dispositif, carte et pions) et repartir d\'un brief vierge ?')){
+    try{ localStorage.removeItem(KEY); }catch(e){}
+    S=JSON.parse(JSON.stringify(DEF)); seed(); save();
+    location.reload();
+  }
+}
+$('resetBtn').onclick=doReset;
+$('btnResetSend').onclick=doReset;
+
+/* ---------- TABS ---------- */
+var tabs=document.querySelectorAll('.tabbar button');
+tabs.forEach(function(b){
+  b.onclick=function(){
+    tabs.forEach(function(x){x.classList.remove('on');});
+    b.classList.add('on');
+    document.querySelectorAll('.panel').forEach(function(p){p.classList.remove('on');});
+    $('tab-'+b.dataset.tab).classList.add('on');
+    if(b.dataset.tab==='carte'){ setTimeout(function(){ if(LMAP){LMAP.invalidateSize();} },80); }
+    if(b.dataset.tab==='apercu'){ renderPreview(); }
+    window.scrollTo(0,0);
+  };
+});
+
+/* ---------- MAP ---------- */
+var LMAP=null, armed=null, MARKERS=[], SECTORS=[];
+var TYPES={
+  cible:{color:'#D0574C',shape:'circle',label:'CIBLE'},
+  vehcible:{color:'#D0574C',shape:'square',label:'V'},
+  enq:{color:'#C6A15B',shape:'circle',label:'A1'},
+  vehequipe:{color:'#5a8fd6',shape:'square',label:'VB'},
+  rv:{color:'#6FBF7A',shape:'circle',label:'RV'},
+  repli:{color:'#6FBF7A',shape:'square',label:'R'}
+};
+function initMap(){
+  if(LMAP)return;
+  LMAP=L.map('map',{zoomControl:true,attributionControl:true}).setView(S.map.center,S.map.zoom);
+  var ign=L.tileLayer('https://data.geopf.fr/wmts?SERVICE=WMTS&REQUEST=GetTile&VERSION=1.0.0&LAYER=ORTHOIMAGERY.ORTHOPHOTOS&STYLE=normal&FORMAT=image/jpeg&TILEMATRIXSET=PM&TILEMATRIX={z}&TILEROW={y}&TILECOL={x}',{maxZoom:21,maxNativeZoom:19,attribution:'© IGN/Géoplateforme'});
+  var esri=L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}',{maxZoom:19,attribution:'© Esri'});
+  var plan=L.tileLayer('https://data.geopf.fr/wmts?SERVICE=WMTS&REQUEST=GetTile&VERSION=1.0.0&LAYER=GEOGRAPHICALGRIDSYSTEMS.PLANIGNV2&STYLE=normal&FORMAT=image/png&TILEMATRIXSET=PM&TILEMATRIX={z}&TILEROW={y}&TILECOL={x}',{maxZoom:21,maxNativeZoom:19,attribution:'© IGN'});
+  ign.addTo(LMAP);
+  var layerKeyByName={'Satellite IGN':'ignsat','Satellite Esri':'esri','Plan IGN':'plan'};
+  if(S.map.layer==='esri'){ LMAP.removeLayer(ign); esri.addTo(LMAP); }
+  else if(S.map.layer==='plan'){ LMAP.removeLayer(ign); plan.addTo(LMAP); }
+  else { S.map.layer='ignsat'; }
+  L.control.layers({'Satellite IGN':ign,'Satellite Esri':esri,'Plan IGN':plan},null,{position:'topright'}).addTo(LMAP);
+  LMAP.on('baselayerchange',function(e){ S.map.layer=layerKeyByName[e.name]||'ignsat'; save(); });
+  LMAP.on('moveend',function(){ S.map.center=[LMAP.getCenter().lat,LMAP.getCenter().lng]; S.map.zoom=LMAP.getZoom(); save(); });
+  LMAP.on('click',function(e){ if(armed){ if(armed==='secteur'){ placeSector(e.latlng);} else { placeMarker(armed,e.latlng);} } });
+  // restore
+  (S.map.markers||[]).forEach(function(m){ placeMarker(m.type,L.latLng(m.lat,m.lng),m.label,true); });
+  (S.map.sectors||[]).forEach(function(s){ placeSector(L.latLng(s.lat,s.lng),s.letter,s.radius,true); });
+}
+function mkIcon(type,label){
+  var t=TYPES[type]; var cls='mk-div'+(t.shape==='square'?' mk-sq':'');
+  var html='<div class="'+cls+'" style="width:26px;height:26px;background:'+t.color+'">'+esc(label||'')+'</div>';
+  if(type==='cible'||type==='enq'||type==='vehequipe'||type==='rv'||type==='repli'||type==='vehcible'){
+    html='<div style="position:relative"><div class="'+cls+'" style="width:26px;height:26px;background:'+t.color+';font-size:10px">'+esc(shortLab(label))+'</div><div class="mk-lab">'+esc(label||'')+'</div></div>';
+  }
+  return L.divIcon({className:'',html:html,iconSize:[26,26],iconAnchor:[13,13]});
+}
+function shortLab(l){ if(!l)return''; l=String(l); if(l.length<=3)return l; return l.substring(0,2); }
+function placeMarker(type,latlng,label,restore){
+  if(label==null){
+    var def=TYPES[type].label;
+    if(type==='enq'){ // suggest from équipe
+      var used=MARKERS.filter(function(x){return x.data.type==='enq';}).length;
+      var e=S.eq[used]; def=e?(e.ind||e.nom||'A'+(used+1)):'A'+(used+1);
+    }
+    label=prompt('Étiquette du pion :',def)||def;
+  }
+  var m=L.marker(latlng,{icon:mkIcon(type,label),draggable:true}).addTo(LMAP);
+  var rec={type:type,label:label,marker:m,data:{type:type,label:label,lat:latlng.lat,lng:latlng.lng}};
+  m.on('dragend',function(){ var ll=m.getLatLng(); rec.data.lat=ll.lat; rec.data.lng=ll.lng; syncMap(); });
+  m.on('click',function(){
+    var choice=prompt('Renommer le pion (laisser vide pour supprimer) :',rec.label);
+    if(choice===null)return;
+    if(choice.trim()===''){ LMAP.removeLayer(m); MARKERS=MARKERS.filter(function(x){return x!==rec;}); syncMap(); return; }
+    rec.label=choice; rec.data.label=choice; m.setIcon(mkIcon(type,choice)); syncMap();
+  });
+  MARKERS.push(rec);
+  disarm();
+  if(!restore) syncMap();
+}
+function placeSector(latlng,letter,radius,restore){
+  if(letter==null){ letter=prompt('Lettre du secteur :','A')||'A'; }
+  radius=radius||160;
+  var circle=L.circle(latlng,{radius:radius,color:'#C6A15B',weight:1.5,dashArray:'5 5',fillColor:'#C6A15B',fillOpacity:.08}).addTo(LMAP);
+  var center=L.marker(latlng,{icon:L.divIcon({className:'',html:'<div class="mk-div sec-badge" style="width:30px;height:30px">'+esc(letter)+'</div>',iconSize:[30,30],iconAnchor:[15,15]}),draggable:true}).addTo(LMAP);
+  var rec={letter:letter,radius:radius,circle:circle,center:center,data:{letter:letter,radius:radius,lat:latlng.lat,lng:latlng.lng}};
+  center.on('drag',function(){ circle.setLatLng(center.getLatLng()); });
+  center.on('dragend',function(){ var ll=center.getLatLng(); rec.data.lat=ll.lat; rec.data.lng=ll.lng; syncMap(); });
+  center.on('click',function(){
+    var a=prompt('Secteur — lettre (vide = supprimer) :',rec.letter);
+    if(a===null)return;
+    if(a.trim()===''){ LMAP.removeLayer(circle);LMAP.removeLayer(center); SECTORS=SECTORS.filter(function(x){return x!==rec;}); syncMap(); return; }
+    rec.letter=a; rec.data.letter=a; center.setIcon(L.divIcon({className:'',html:'<div class="mk-div sec-badge" style="width:30px;height:30px">'+esc(a)+'</div>',iconSize:[30,30],iconAnchor:[15,15]}));
+    var r=prompt('Rayon en mètres :',rec.radius); if(r&&!isNaN(+r)){rec.radius=+r;rec.data.radius=+r;circle.setRadius(+r);}
+    syncMap();
+  });
+  SECTORS.push(rec);
+  disarm();
+  if(!restore) syncMap();
+}
+function syncMap(){
+  S.map.markers=MARKERS.map(function(x){return x.data;});
+  S.map.sectors=SECTORS.map(function(x){return x.data;});
+  save();
+}
+function arm(type){ armed=type; document.querySelectorAll('.ptool').forEach(function(p){p.classList.toggle('armed',p.dataset.type===type);});
+  $('paletteMsg').textContent='Touche la carte pour poser : '+type; }
+function disarm(){ armed=null; document.querySelectorAll('.ptool').forEach(function(p){p.classList.remove('armed');}); $('paletteMsg').textContent='Touche un type puis touche la carte pour le poser.'; }
+document.querySelectorAll('.ptool').forEach(function(p){ p.onclick=function(){ if(armed===p.dataset.type)disarm(); else arm(p.dataset.type); }; });
+$('clearMap').onclick=function(){ if(!confirm('Effacer tous les pions et secteurs ?'))return;
+  MARKERS.forEach(function(x){LMAP.removeLayer(x.marker);}); SECTORS.forEach(function(x){LMAP.removeLayer(x.circle);LMAP.removeLayer(x.center);});
+  MARKERS=[];SECTORS=[];syncMap(); };
+
+// geocoder
+$('geoBtn').onclick=doGeo;
+$('geoInput').addEventListener('keydown',function(e){ if(e.key==='Enter')doGeo(); });
+function doGeo(){
+  var q=$('geoInput').value.trim(); if(!q)return;
+  $('paletteMsg').textContent='Recherche…';
+  fetch('https://data.geopf.fr/geocodage/search?limit=1&q='+encodeURIComponent(q))
+    .then(function(r){return r.json();})
+    .then(function(j){
+      if(j&&j.features&&j.features.length){
+        var c=j.features[0].geometry.coordinates; LMAP.setView([c[1],c[0]],16);
+        $('paletteMsg').textContent='Adresse trouvée.';
+      } else { $('paletteMsg').textContent='Adresse introuvable — place manuellement.'; }
+    })
+    .catch(function(){ $('paletteMsg').textContent='Recherche indisponible (réseau) — navigue à la main.'; });
+}
+
+/* ---------- STATIC MAP FOR BRIEF ---------- */
+function genStaticMap(){
+  if(!LMAP){ $('genMsg').textContent='Ouvre d\'abord la carte.'; return; }
+  var b=LMAP.getBounds(), crs=LMAP.options.crs;
+  var sw=crs.project(b.getSouthWest()), ne=crs.project(b.getNorthEast());
+  var minX=sw.x,maxX=ne.x,minY=sw.y,maxY=ne.y;
+  var W=760, H=Math.round(W*(maxY-minY)/(maxX-minX));
+  if(H<300)H=300; if(H>900)H=900;
+  var lay=S.map.layer||'ignsat', url;
+  if(lay==='esri'){
+    url='https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/export?bbox='+minX+','+minY+','+maxX+','+maxY+'&bboxSR=3857&imageSR=3857&size='+W+','+H+'&format=jpg&f=image';
+  } else {
+    var wmsLayer=(lay==='plan')?'GEOGRAPHICALGRIDSYSTEMS.PLANIGNV2':'ORTHOIMAGERY.ORTHOPHOTOS';
+    var fmt=(lay==='plan')?'image/png':'image/jpeg';
+    url='https://data.geopf.fr/wms-r/wms?SERVICE=WMS&VERSION=1.3.0&REQUEST=GetMap&LAYERS='+wmsLayer+'&STYLES=&CRS=EPSG:3857'+
+      '&BBOX='+minX+','+minY+','+maxX+','+maxY+'&WIDTH='+W+'&HEIGHT='+H+'&FORMAT='+fmt;
+  }
+  var pts=MARKERS.map(function(m){
+    var p=crs.project(L.latLng(m.data.lat,m.data.lng));
+    return {type:m.data.type,label:m.data.label,x:(p.x-minX)/(maxX-minX)*100,y:(maxY-p.y)/(maxY-minY)*100};
+  });
+  var secs=SECTORS.map(function(s){
+    var p=crs.project(L.latLng(s.data.lat,s.data.lng));
+    return {letter:s.data.letter,x:(p.x-minX)/(maxX-minX)*100,y:(maxY-p.y)/(maxY-minY)*100};
+  });
+  S.mapimg={url:url,W:W,H:H,pts:pts,secs:secs,layer:lay};
+  save();
+  var fond=(lay==='plan')?'Plan IGN':(lay==='esri'?'Satellite Esri':'Satellite IGN');
+  $('genMsg').textContent='Carte figée ✓ ('+fond+') — visible dans l\'Aperçu, le PDF et le partage.';
+  toast('Carte ajoutée au brief');
+}
+$('genMap').onclick=genStaticMap;
+
+/* ---------- PREVIEW ---------- */
+function line(s){ return esc(s).replace(/\n/g,'<br>'); }
+function has(s){ return s&&String(s).trim()!==''; }
+function renderPreview(){
+  var h='';
+  // hero
+  h+='<div class="pv-hero">';
+  h+='<div class="kick">BRIEF OPÉRATIONNEL</div>';
+  h+='<h1>FILATURE</h1>';
+  h+='<div class="meta">';
+  if(has(S.date))h+='<span>Date <b>'+esc(S.date)+'</b></span>';
+  if(has(S.chef))h+='<span>Chef de mission <b>'+esc(S.chef)+'</b></span>';
+  h+='<span>Effectif <b>'+S.eq.length+' enquêteur'+(S.eq.length>1?'s':'')+'</b></span>';
+  h+='</div>';
+  h+='<div class="pv-disc">DISCRÉTION MAXIMALE</div>';
+  h+='</div>';
+
+  // 01 quoi
+  if(has(S.objectif)||has(S.livrable)||has(S.priorite)||has(S.perimetre)){
+    h+='<div class="pv-block"><div class="pv-bh"><span class="n">01</span>QUOI — Objectif</div>';
+    if(has(S.objectif))h+='<p class="pv-obj">'+line(S.objectif)+'</p>';
+    var cells=[['LIVRABLE',S.livrable],['PRIORITÉ',S.priorite],['PÉRIMÈTRE',S.perimetre]].filter(function(c){return has(c[1]);});
+    if(cells.length){ h+='<div class="pv-grid2">'; cells.forEach(function(c){h+='<div><div class="l">'+c[0]+'</div><div>'+esc(c[1])+'</div></div>';}); h+='</div>'; }
+    h+='</div>';
+  }
+  // 02 qui
+  if(has(S.cible)||has(S.veh)||has(S.signes)){
+    h+='<div class="pv-block"><div class="pv-bh"><span class="n">02</span>QUI — Cible</div>';
+    if(has(S.cible))h+='<div style="font-family:var(--sansc);font-size:20px;font-weight:600">'+esc(S.cible)+'</div>';
+    if(has(S.cibledesc))h+='<div style="font-size:13px;color:var(--muted);margin-bottom:8px">'+esc(S.cibledesc)+'</div>';
+    h+='<dl class="pv-kv">';
+    [['SIGNES',S.signes],['DOMICILE',S.domicile],['HABITUDES',S.habitudes],['ASSOCIÉS',S.associes]].forEach(function(c){ if(has(c[1]))h+='<dt>'+c[0]+'</dt><dd>'+esc(c[1])+'</dd>'; });
+    h+='</dl>';
+    if(has(S.veh)||has(S.plaque)){
+      h+='<div class="pv-veh"><div class="vh">VÉHICULE CIBLE</div>';
+      h+='<span>'+esc(S.veh)+'</span>'+(has(S.plaque)?' &nbsp; <span class="pv-plate">'+esc(S.plaque)+'</span>':'');
+      if(has(S.vehsignes))h+='<div style="margin-top:6px;color:var(--muted)">'+esc(S.vehsignes)+'</div>';
+      h+='</div>';
+    }
+    if(has(S.mefiance))h+='<div class="pv-warn"><b>Vigilance :</b> '+line(S.mefiance)+'</div>';
+    h+='</div>';
+  }
+  // 03 quand
+  if(S.tl.length){
+    h+='<div class="pv-block"><div class="pv-bh"><span class="n">03</span>QUAND — Timing</div><div class="pv-tl">';
+    S.tl.forEach(function(t){ if(has(t.h)||has(t.d)) h+='<div class="pv-ev"><div class="h">'+esc(t.h)+'</div><div>'+esc(t.d)+'</div></div>'; });
+    h+='</div></div>';
+  }
+  // 04 ou
+  if(S.mapimg||S.sec.length){
+    h+='<div class="pv-block"><div class="pv-bh"><span class="n">04</span>OÙ — Carte & secteurs</div>';
+    if(S.mapimg){
+      h+='<div class="pv-mapimg"><img src="'+esc(S.mapimg.url)+'" alt="Carte" style="aspect-ratio:'+S.mapimg.W+'/'+S.mapimg.H+'">';
+      (S.mapimg.secs||[]).forEach(function(s){ h+='<div class="pv-mk" style="left:'+s.x+'%;top:'+s.y+'%;background:#C6A15B;color:#080B14;border-radius:5px;width:26px;height:26px;font-size:14px">'+esc(s.letter)+'</div>'; });
+      (S.mapimg.pts||[]).forEach(function(p){
+        var col=(TYPES[p.type]||{}).color||'#C6A15B';
+        h+='<div class="pv-mk" style="left:'+p.x+'%;top:'+p.y+'%;background:'+col+'">'+esc(shortLab(p.label))+'</div>';
+        if(has(p.label))h+='<div class="pv-mklab" style="left:'+p.x+'%;top:'+p.y+'%">'+esc(p.label)+'</div>';
+      });
+      h+='</div>';
+      h+='<div class="pv-legend"><span><i style="background:#D0574C"></i>Cible</span><span><i style="background:#C6A15B"></i>Enquêteur</span><span><i style="background:#5a8fd6"></i>Véh. équipe</span><span><i style="background:#6FBF7A"></i>RV / Repli</span></div>';
+    } else {
+      h+='<p class="pv-empty">Carte non figée. Onglet Carte → « Figer la carte pour le brief ».</p>';
+    }
+    S.sec.forEach(function(s){ if(has(s.l)||has(s.d))h+='<div class="pv-sec"><span class="sb">'+esc(s.l)+'</span><span>'+esc(s.d)+'</span></div>'; });
+    h+='</div>';
+  }
+  // 05 comment
+  if(S.eq.length||S.rule.filter(has).length){
+    h+='<div class="pv-block"><div class="pv-bh"><span class="n">05</span>COMMENT — Dispositif</div>';
+    S.eq.forEach(function(e){
+      h+='<div class="pv-role">';
+      h+='<span class="pv-call">'+esc(e.ind||'—')+'</span>';
+      h+='<div><div class="rn">'+esc(e.nom||'—')+'</div>'+(has(e.role)?'<div class="rr">'+esc(e.role)+'</div>':'')+'</div>';
+      h+='<span class="rt">'+(has(e.secteur)?'SECT. '+esc(e.secteur):'')+'</span></div>';
+    });
+    S.rule.filter(has).forEach(function(r){ h+='<div class="pv-rule" style="margin-top:6px"><span class="b">▸</span><span>'+line(r)+'</span></div>'; });
+    h+='</div>';
+  }
+  // 06 comm
+  if(has(S.comm1)||has(S.comm2)||S.lex.length||has(S.urgence)){
+    h+='<div class="pv-block"><div class="pv-bh"><span class="n">06</span>COMMUNICATION</div>';
+    h+='<div class="pv-comm">';
+    if(has(S.comm1))h+='<div class="pv-cc pri"><div class="cl">CANAL PRINCIPAL</div><div class="cv">'+esc(S.comm1)+'</div></div>';
+    if(has(S.comm2))h+='<div class="pv-cc"><div class="cl">SECOURS</div><div class="cv">'+esc(S.comm2)+'</div></div>';
+    h+='</div>';
+    if(S.eq.length>30)h+='<div class="pv-warn" style="color:var(--gold-soft);background:rgba(198,161,91,.06);border-color:var(--gold-deep)"><b>Effectif '+S.eq.length+' :</b> un canal par secteur + un canal commandement obligatoires.</div>';
+    var lx=S.lex.filter(function(l){return has(l.c)||has(l.m);});
+    if(lx.length){ h+='<div class="pv-lex"><div class="lh">LEXIQUE RADIO</div>'; lx.forEach(function(l){h+='<div class="pv-lx"><span class="c">'+esc(l.c)+'</span><span class="m">'+esc(l.m)+'</span></div>';}); h+='</div>'; }
+    if(has(S.urgence)){
+      h+='<div class="pv-urg">';
+      h+='<div class="pv-u e"><div class="l">URGENCE / DANGER</div><div class="v">'+esc(S.urgence)+'</div></div>';
+      h+='</div>';
+    }
+    h+='</div>';
+  }
+  // 07 secu
+  if(S.secu.filter(has).length){
+    h+='<div class="pv-block"><div class="pv-bh"><span class="n">07</span>SÉCURITÉ</div>';
+    S.secu.filter(has).forEach(function(s){h+='<div class="pv-ck"><span class="b">▸</span><span>'+line(s)+'</span></div>';});
+    h+='</div>';
+  }
+  // 08 logi
+  if(S.logi.filter(has).length){
+    h+='<div class="pv-block" style="border-bottom:none"><div class="pv-bh"><span class="n">08</span>LOGISTIQUE</div><div class="pv-logi">';
+    S.logi.filter(has).forEach(function(l){h+='<div class="pv-li">'+esc(l)+'</div>';});
+    h+='</div></div>';
+  }
+  if(h.indexOf('pv-block')===-1) h+='<div style="padding:40px 20px;text-align:center;color:var(--muted2)">Remplis le brief dans l\'onglet Éditer pour voir l\'aperçu.</div>';
+  $('preview').innerHTML=h;
+}
+
+/* ---------- ENVOYER ---------- */
+function buildText(){
+  var L=[];
+  L.push('=== BRIEF DE FILATURE ===');
+  var meta=[]; if(has(S.date))meta.push(S.date); if(has(S.chef))meta.push('CM: '+S.chef); meta.push(S.eq.length+' enq.');
+  L.push(meta.join(' | '));
+  L.push('Discrétion maximale');
+  L.push('');
+  if(has(S.objectif)){L.push('[QUOI] '+S.objectif);
+    var d=[]; if(has(S.livrable))d.push('Livrable: '+S.livrable); if(has(S.priorite))d.push('Priorité: '+S.priorite); if(has(S.perimetre))d.push('Périmètre: '+S.perimetre);
+    if(d.length)L.push('  '+d.join(' · ')); L.push('');}
+  if(has(S.cible)){L.push('[QUI] '+S.cible+(has(S.cibledesc)?' — '+S.cibledesc:''));
+    if(has(S.signes))L.push('  Signes: '+S.signes);
+    if(has(S.domicile))L.push('  Domicile: '+S.domicile);
+    if(has(S.habitudes))L.push('  Habitudes: '+S.habitudes);
+    if(has(S.associes))L.push('  Associés: '+S.associes);
+    if(has(S.veh))L.push('  Véhicule: '+S.veh+(has(S.plaque)?' ['+S.plaque+']':'')+(has(S.vehsignes)?' — '+S.vehsignes:''));
+    if(has(S.mefiance))L.push('  ⚠ Vigilance: '+S.mefiance);
+    L.push('');}
+  if(S.tl.length){L.push('[QUAND]'); S.tl.forEach(function(t){if(has(t.h)||has(t.d))L.push('  '+(t.h||'')+' — '+(t.d||''));}); L.push('');}
+  if(S.sec.length){L.push('[OÙ — SECTEURS]'); S.sec.forEach(function(s){if(has(s.l)||has(s.d))L.push('  '+(s.l||'')+' : '+(s.d||''));}); L.push('  (carte : voir PDF/image jointe)'); L.push('');}
+  if(S.eq.length){L.push('[COMMENT — DISPOSITIF]'); S.eq.forEach(function(e){L.push('  '+(e.ind?'['+e.ind+'] ':'')+(e.nom||'')+(e.role?' — '+e.role:'')+(e.secteur?' (sect. '+e.secteur+')':''));});
+    S.rule.filter(has).forEach(function(r){L.push('  ▸ '+r);}); L.push('');}
+  var cm=[]; if(has(S.comm1))cm.push('Principal: '+S.comm1); if(has(S.comm2))cm.push('Secours: '+S.comm2);
+  if(cm.length||S.lex.length){L.push('[COMMUNICATION]'); cm.forEach(function(x){L.push('  '+x);});
+    S.lex.filter(function(l){return has(l.c);}).forEach(function(l){L.push('  '+l.c+' = '+l.m);});
+    if(has(S.urgence))L.push('  URGENCE: '+S.urgence); L.push('');}
+  if(S.secu.filter(has).length){L.push('[SÉCURITÉ]'); S.secu.filter(has).forEach(function(s){L.push('  ▸ '+s);}); L.push('');}
+  if(S.logi.filter(has).length){L.push('[LOGISTIQUE] '+S.logi.filter(has).join(' · '));}
+  L.push(''); L.push('— À supprimer en fin de mission —');
+  return L.join('\n');
+}
+/* --- carte annotée en PNG (fond + pions + secteurs) --- */
+function roundRect(x,a,b,w,h,r){ x.beginPath();x.moveTo(a+r,b);x.arcTo(a+w,b,a+w,b+h,r);x.arcTo(a+w,b+h,a,b+h,r);x.arcTo(a,b+h,a,b,r);x.arcTo(a,b,a+w,b,r);x.closePath(); }
+function drawPin(x,px,py,fill,txtcol,label,isSector){
+  x.save(); x.textAlign='center'; x.textBaseline='middle';
+  var r=13;
+  if(isSector){ roundRect(x,px-15,py-15,30,30,6); } else { x.beginPath(); x.arc(px,py,r,0,2*Math.PI); }
+  x.fillStyle=fill; x.fill(); x.lineWidth=2; x.strokeStyle='#080B14'; x.stroke();
+  x.fillStyle=txtcol; x.font='bold '+(isSector?16:12)+'px sans-serif';
+  x.fillText(isSector?String(label||''):shortLab(label),px,py+0.5);
+  if(!isSector && label && String(label).length>2){
+    x.font='bold 11px monospace'; var w=x.measureText(label).width+10;
+    x.fillStyle='rgba(8,11,20,.85)'; roundRect(x,px-w/2,py-r-21,w,16,3); x.fill();
+    x.lineWidth=1; x.strokeStyle='#232E47'; x.stroke();
+    x.fillStyle='#fff'; x.fillText(label,px,py-r-13);
+  }
+  x.restore();
+}
+function composeMapBlob(cb){
+  var mi=S.mapimg;
+  if(!mi||!mi.url){ cb(null); return; }
+  var img=new Image(); img.crossOrigin='anonymous';
+  img.onload=function(){
+    try{
+      var c=document.createElement('canvas'); c.width=mi.W; c.height=mi.H;
+      var x=c.getContext('2d'); x.drawImage(img,0,0,mi.W,mi.H);
+      (mi.secs||[]).forEach(function(s){ drawPin(x,s.x/100*mi.W,s.y/100*mi.H,'#C6A15B','#080B14',s.letter,true); });
+      (mi.pts||[]).forEach(function(p){ var col=(TYPES[p.type]||{}).color||'#C6A15B'; drawPin(x,p.x/100*mi.W,p.y/100*mi.H,col,'#fff',p.label,false); });
+      c.toBlob(function(b){ cb(b); },'image/png');
+    }catch(e){ cb(null); }
+  };
+  img.onerror=function(){ cb(null); };
+  img.src=mi.url;
+}
+$('btnShare').onclick=function(){
+  var txt=buildText();
+  composeMapBlob(function(blob){
+    if(blob && navigator.canShare){
+      try{
+        var file=new File([blob],'carte-mission.png',{type:'image/png'});
+        if(navigator.canShare({files:[file]})){
+          navigator.share({title:'Brief de filature',text:txt,files:[file]}).catch(function(){});
+          return;
+        }
+      }catch(e){}
+    }
+    if(navigator.share){ navigator.share({title:'Brief de filature',text:txt}).catch(function(){}); }
+    else { copyText(txt); toast('Partage natif indisponible — texte copié'); }
+    if(S.mapimg&&!blob){ toast('Carte non jointe ici — utilise le PDF (carte incluse)'); }
+  });
+};
+$('btnCopy').onclick=function(){ copyText(buildText()); };
+function copyText(txt){
+  if(navigator.clipboard&&navigator.clipboard.writeText){ navigator.clipboard.writeText(txt).then(function(){toast('Texte copié ✓');},function(){fallbackCopy(txt);}); }
+  else fallbackCopy(txt);
+}
+function fallbackCopy(txt){ var t=document.createElement('textarea'); t.value=txt; document.body.appendChild(t); t.select(); try{document.execCommand('copy');toast('Texte copié ✓');}catch(e){toast('Copie impossible');} document.body.removeChild(t); }
+$('btnPdf').onclick=function(){ renderPreview(); window.print(); };
+$('btnMapImg').onclick=function(){
+  if(!(S.mapimg&&S.mapimg.url)){ toast('Fige d\'abord la carte (onglet Carte)'); return; }
+  composeMapBlob(function(blob){
+    if(blob){ var u=URL.createObjectURL(blob); var a=document.createElement('a'); a.href=u; a.download='carte-mission.png'; document.body.appendChild(a); a.click(); document.body.removeChild(a); setTimeout(function(){URL.revokeObjectURL(u);},4000); toast('Carte annotée enregistrée ✓'); }
+    else { window.open(S.mapimg.url,'_blank'); toast('Carte ouverte (pions non fusionnés — réseau requis)'); }
+  });
+};
+
+/* ---------- MODE PRÉSENTATION ---------- */
+var PR_SLIDES=[], PR_I=0;
+function prShow(i){
+  if(i<0)i=0; if(i>=PR_SLIDES.length)i=PR_SLIDES.length-1; PR_I=i;
+  PR_SLIDES.forEach(function(s,k){ s.classList.toggle('on',k===i); });
+  $('prCount').textContent=(i+1)+' / '+PR_SLIDES.length;
+  $('prPrev').disabled=(i===0); $('prNext').disabled=(i===PR_SLIDES.length-1);
+  $('prStage').scrollTop=0;
+}
+function prStart(){
+  renderPreview();
+  var src=$('preview').children, stage=$('prStage'); stage.innerHTML=''; PR_SLIDES=[];
+  if(!src.length){ toast('Rien à présenter — remplis le brief'); return; }
+  for(var i=0;i<src.length;i++){
+    var s=document.createElement('div'); s.className='pr-slide';
+    s.appendChild(src[i].cloneNode(true)); stage.appendChild(s); PR_SLIDES.push(s);
+  }
+  $('present').classList.add('on'); prShow(0);
+  var el=$('present'); if(el.requestFullscreen){ el.requestFullscreen().catch(function(){}); }
+  document.addEventListener('keydown',prKey);
+}
+function prStop(){
+  $('present').classList.remove('on');
+  document.removeEventListener('keydown',prKey);
+  if(document.fullscreenElement&&document.exitFullscreen){ document.exitFullscreen().catch(function(){}); }
+}
+function prKey(e){
+  if(e.key==='ArrowRight'||e.key==='ArrowDown'||e.key===' ')prShow(PR_I+1);
+  else if(e.key==='ArrowLeft'||e.key==='ArrowUp')prShow(PR_I-1);
+  else if(e.key==='Escape')prStop();
+}
+$('btnPresent').onclick=prStart;
+$('prPrev').onclick=function(){prShow(PR_I-1);};
+$('prNext').onclick=function(){prShow(PR_I+1);};
+$('prExit').onclick=prStop;
+$('prPrevZone').onclick=function(){prShow(PR_I-1);};
+$('prNextZone').onclick=function(){prShow(PR_I+1);};
+var _tx=null;
+$('present').addEventListener('touchstart',function(e){ _tx=e.changedTouches[0].clientX; },{passive:true});
+$('present').addEventListener('touchend',function(e){ if(_tx==null)return; var dx=e.changedTouches[0].clientX-_tx; if(Math.abs(dx)>50){ prShow(PR_I+(dx<0?1:-1)); } _tx=null; },{passive:true});
+
+function toast(msg){ var t=$('toast'); t.textContent=msg; t.classList.add('show'); setTimeout(function(){t.classList.remove('show');},1800); }
+
+/* init map lazily when tab opened; also init now if reduced */
+initMap();
+})();
+</script>
+</body>
+</html>
