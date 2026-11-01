@@ -20,12 +20,13 @@ const CACHE_SECONDS = 600; // 10 min : limite le coût et la charge sur les sour
 
 // Requêtes presse par famille de risque (ordre = priorité de classement)
 const CATEGORIES = [
-  { label: 'Ordre public', q: 'manifestation OR rassemblement OR grève OR blocage OR émeute OR "violences urbaines" OR "rodéo urbain"' },
-  { label: 'Sécurité / menace', q: 'attentat OR "alerte à la bombe" OR évacuation OR fusillade OR "règlement de comptes" OR "colis suspect" OR "coups de feu"' },
-  { label: 'Risque industriel / accident', q: 'explosion OR incendie OR "fuite de gaz" OR "accident industriel" OR Seveso OR confinement OR pollution' },
-  { label: 'Événements / arrêtés', q: 'match OR concert OR festival OR salon OR "visite présidentielle" OR "visite ministérielle" OR "arrêté préfectoral"' },
-  { label: 'Circulation / travaux', q: 'travaux OR "route coupée" OR "circulation perturbée" OR déviation OR fermeture OR bouchons' },
-  { label: 'Actualité locale', q: '' }
+  { label: 'À venir', days: 14, q: 'prévu OR prévue OR "appel à manifester" OR "appel à la grève" OR préavis OR "ce week-end" OR "la semaine prochaine" OR "aura lieu" OR "se tiendra" OR "se déroulera" OR programme OR annonce' },
+  { label: 'Ordre public', days: 7, q: 'manifestation OR rassemblement OR grève OR blocage OR émeute OR "violences urbaines" OR "rodéo urbain"' },
+  { label: 'Sécurité / menace', days: 7, q: 'attentat OR "alerte à la bombe" OR évacuation OR fusillade OR "règlement de comptes" OR "colis suspect" OR "coups de feu"' },
+  { label: 'Risque industriel / accident', days: 7, q: 'explosion OR incendie OR "fuite de gaz" OR "accident industriel" OR Seveso OR confinement OR pollution' },
+  { label: 'Événements / arrêtés', days: 7, q: 'match OR concert OR festival OR salon OR "visite présidentielle" OR "visite ministérielle" OR "arrêté préfectoral"' },
+  { label: 'Circulation / travaux', days: 7, q: 'travaux OR "route coupée" OR "circulation perturbée" OR déviation OR fermeture OR bouchons' },
+  { label: 'Actualité locale', days: 7, q: '' }
 ];
 
 const EFFETS = { NO_SERVICE: 'Trafic interrompu', REDUCED_SERVICE: 'Service réduit', SIGNIFICANT_DELAYS: 'Retards importants', DETOUR: 'Itinéraire modifié', MODIFIED_SERVICE: 'Service modifié', ADDITIONAL_SERVICE: 'Service supplémentaire', STOP_MOVED: 'Arrêt déplacé', OTHER_EFFECT: 'Perturbation', UNKNOWN_EFFECT: 'Perturbation' };
@@ -48,12 +49,15 @@ export default {
     const cp = (url.searchParams.get('cp') || '').trim();
     const lat = parseFloat(url.searchParams.get('lat'));
     const lon = parseFloat(url.searchParams.get('lon'));
+    const today = parisDate(new Date());
+    const dParam = url.searchParams.get('date') || '';
+    const date = /^\d{4}-\d{2}-\d{2}$/.test(dParam) && dParam >= today ? dParam : today;
     const byCp = /^\d{5}$/.test(cp);
     const byLl = !isNaN(lat) && !isNaN(lon);
     if (!byCp && !byLl) return json({ error: 'Code postal (5 chiffres) ou position requis' }, 400, cors);
 
     // Cache partagé : même secteur dans les 10 min = pas de nouvel appel aux sources
-    const cacheKey = new Request(url.origin + '/cache?' + (byCp ? 'cp=' + cp : 'll=' + lat.toFixed(3) + ',' + lon.toFixed(3)));
+    const cacheKey = new Request(url.origin + '/cache?' + (byCp ? 'cp=' + cp : 'll=' + lat.toFixed(3) + ',' + lon.toFixed(3)) + '&d=' + date);
     const cache = caches.default;
     const hit = await cache.match(cacheKey);
     if (hit) return new Response(hit.body, { status: 200, headers: { ...Object.fromEntries(hit.headers), ...cors } });
@@ -68,11 +72,12 @@ export default {
     const cLat = byLl ? lat : (centre ? centre[1] : null);
     const cLon = byLl ? lon : (centre ? centre[0] : null);
 
-    const [vigilance, georisques, sncf, presse] = await Promise.all([
+    const [vigilance, georisques, sncf, presse, prevision] = await Promise.all([
       safe(() => getVigilance(dep, env)),
       safe(() => getGeorisques(c.code, env)),
       safe(() => getSncf(cLat, cLon, env)),
-      safe(() => getPresse(c.nom))
+      safe(() => getPresse(c.nom)),
+      safe(() => getPrevision(cLat, cLon, date))
     ]);
     const articles = Array.isArray(presse.items) ? presse.items : [];
     const base = {
@@ -82,6 +87,8 @@ export default {
       departement: c.departement ? c.departement.nom + ' (' + dep + ')' : '',
       autresCommunes: byCp ? communes.slice(1).map(x => x.nom) : [],
       maj: new Date().toISOString(),
+      dateMission: date,
+      prevision,
       vigilance, georisques, sncf,
       presse: articles
     };
@@ -91,7 +98,8 @@ export default {
       ...base,
       synthese,
       sources: {
-        'Météo': vigilance.statut,
+        'Prévisions': prevision.statut,
+        'Vigilance': vigilance.statut,
         'Géorisques': georisques.statut,
         'Trains': sncf.statut,
         'Presse': presse.statut || 'indisponible',
@@ -105,6 +113,9 @@ export default {
 };
 
 // ---------- utilitaires ----------
+function parisDate(d) {
+  return d.toLocaleDateString('sv-SE', { timeZone: 'Europe/Paris' }); // AAAA-MM-JJ
+}
 async function safe(fn) {
   try { return await fn(); } catch (e) { return { statut: 'indisponible' }; }
 }
@@ -151,7 +162,9 @@ async function getVigilance(dep, env) {
       const col = +ph.phenomenon_max_color_id || 1;
       if (!max[id] || col > max[id]) max[id] = col;
     }));
+    const deb = Date.parse(p.begin_validity_time), fin = Date.parse(p.end_validity_time);
     return {
+      date: (!isNaN(deb) && !isNaN(fin)) ? parisDate(new Date((deb + fin) / 2)) : '',
       echeance: p.echeance || '',
       debut: p.begin_validity_time || '',
       fin: p.end_validity_time || '',
@@ -229,7 +242,7 @@ async function getPresse(ville) {
   const diag = [];
   // 1) Google Actualités (avec cookie de consentement pour éviter la page RGPD en Europe)
   let lists = await Promise.all(CATEGORIES.map(c => {
-    const q = '"' + ville + '"' + (c.q ? ' (' + c.q + ')' : '') + ' when:7d';
+    const q = '"' + ville + '"' + (c.q ? ' (' + c.q + ')' : '') + ' when:' + c.days + 'd';
     return rss('https://news.google.com/rss/search?q=' + encodeURIComponent(q) + '&hl=fr&gl=FR&ceid=FR:fr', 'source');
   }));
   let n = lists.reduce((a, l) => a + l.items.length, 0);
@@ -238,15 +251,15 @@ async function getPresse(ville) {
   if (!n) {
     lists = await Promise.all(CATEGORIES.map(c => {
       const q = '"' + ville + '"' + (c.q ? ' (' + c.q + ')' : '');
-      return rss('https://www.bing.com/news/search?format=rss&setlang=fr-FR&cc=FR&qft=interval%3d%228%22&q=' + encodeURIComponent(q), 'News:Source');
+      return rss('https://www.bing.com/news/search?format=rss&setlang=fr-FR&cc=FR&qft=interval%3d%22' + (c.days > 7 ? 9 : 8) + '%22&q=' + encodeURIComponent(q), 'News:Source');
     }));
     n = lists.reduce((a, l) => a + l.items.length, 0);
     diag.push('Bing ' + (n ? n : (lists[0].err || '0')));
   }
-  const limite = Date.now() - 8 * 86400000;
   const seen = new Set();
   const items = [];
   lists.forEach((l, i) => {
+    const limite = Date.now() - (CATEGORIES[i].days + 1) * 86400000;
     l.items.filter(a => { const t = Date.parse(a.date); return isNaN(t) || t >= limite; })
       .slice(0, i === CATEGORIES.length - 1 ? 6 : 8).forEach(a => {
         const k = a.titre.toLowerCase();
@@ -290,13 +303,45 @@ async function rss(url, sourceTag) {
   }
 }
 
+// ---------- 5 bis. Prévisions du jour de mission (Open-Meteo, sans clé, jusqu'à J+15) ----------
+const TEMPS = c => c === 0 ? 'Ciel clair' : c <= 3 ? 'Nuageux' : c <= 48 ? 'Brouillard' : c <= 57 ? 'Bruine' : c <= 67 ? 'Pluie' : c <= 77 ? 'Neige' : c <= 82 ? 'Averses' : c <= 86 ? 'Averses de neige' : 'Orages';
+async function getPrevision(lat, lon, date) {
+  if (lat == null || lon == null) return { statut: 'position inconnue' };
+  const u = 'https://api.open-meteo.com/v1/forecast?latitude=' + lat + '&longitude=' + lon +
+    '&daily=weather_code,temperature_2m_min,temperature_2m_max,precipitation_sum,precipitation_probability_max,wind_gusts_10m_max,sunrise,sunset' +
+    '&timezone=Europe%2FParis&start_date=' + date + '&end_date=' + date;
+  const r = await fetch(u);
+  if (r.status === 400) return { statut: 'hors période (max J+15)' };
+  if (!r.ok) return { statut: 'indisponible (' + r.status + ')' };
+  const j = await r.json();
+  const d = j.daily;
+  if (!d || !d.time || !d.time.length) return { statut: 'indisponible' };
+  const hm = s => (s || '').slice(11, 16);
+  return {
+    statut: 'ok',
+    date: d.time[0],
+    temps: TEMPS(d.weather_code[0]),
+    tmin: Math.round(d.temperature_2m_min[0]),
+    tmax: Math.round(d.temperature_2m_max[0]),
+    pluie_mm: d.precipitation_sum[0],
+    pluie_proba: d.precipitation_probability_max ? d.precipitation_probability_max[0] : null,
+    rafales_kmh: Math.round(d.wind_gusts_10m_max[0]),
+    lever: hm(d.sunrise[0]),
+    coucher: hm(d.sunset[0])
+  };
+}
+
 // ---------- 6. Synthèse IA (Claude) ----------
 async function getSynthese(d, env) {
   if (!env.ANTHROPIC_API_KEY) return { statut: 'non configuré' };
   const presse = d.presse.map((a, i) => '[' + (i + 1) + '] (' + a.cat + ') ' + a.date + ' — ' + a.titre + ' — ' + a.source).join('\n') || 'aucun article';
-  const vig = d.vigilance.statut === 'ok' && d.vigilance.periodes[0]
-    ? d.vigilance.periodes[0].phenomenes.filter(p => p.couleur >= 2).map(p => p.nom + ' niveau ' + ['', 'vert', 'jaune', 'orange', 'rouge'][p.couleur]).join(', ') || 'aucune'
-    : 'donnée indisponible';
+  const per = d.vigilance.statut === 'ok' ? (d.vigilance.periodes || []).find(p => p.date === d.dateMission) : null;
+  const vig = per
+    ? per.phenomenes.filter(p => p.couleur >= 2).map(p => p.nom + ' niveau ' + ['', 'vert', 'jaune', 'orange', 'rouge'][p.couleur]).join(', ') || 'aucune'
+    : 'pas encore publiée pour cette date (publication la veille)';
+  const pv = d.prevision.statut === 'ok'
+    ? d.prevision.temps + ', ' + d.prevision.tmin + ' à ' + d.prevision.tmax + ' °C, pluie ' + d.prevision.pluie_mm + ' mm' + (d.prevision.pluie_proba != null ? ' (' + d.prevision.pluie_proba + ' %)' : '') + ', rafales ' + d.prevision.rafales_kmh + ' km/h, lever ' + d.prevision.lever + ', coucher ' + d.prevision.coucher
+    : 'indisponible';
   const geo = d.georisques.statut && d.georisques.statut !== 'indisponible'
     ? 'Risques recensés : ' + (d.georisques.risques.join(', ') || 'aucun') + '. Sites Seveso : ' + (d.georisques.seveso.map(s => s.nom).join(', ') || 'aucun')
     : 'donnée indisponible';
@@ -305,30 +350,34 @@ async function getSynthese(d, env) {
     : 'donnée indisponible';
 
   const prompt =
-`Tu es analyste sûreté. Une équipe d'enquêteurs privés prépare une mission discrète d'observation sur la voie publique à ${d.ville} (${d.departement}), dans les 24 à 48 h.
+`Tu es analyste sûreté. Une équipe d'enquêteurs privés prépare une mission discrète d'observation sur la voie publique à ${d.ville} (${d.departement}) le ${d.dateMission} (aujourd'hui : ${parisDate(new Date())}).
 
-Évalue la situation du secteur pour cette mission : foules, manifestations, présence policière renforcée, menaces, perturbations de circulation ou de transport, risques météo et technologiques, danger pour l'équipe.
+PRIORITÉ : ce qui est PRÉVU ou ATTENDU le jour de la mission (manifestations annoncées, préavis de grève, matchs, événements, travaux, visites officielles, arrêtés). Les articles décrivent souvent des événements à venir : déduis leur date à partir du texte et de la date de publication. Les faits passés ne servent que de contexte (tensions persistantes, dispositif policier en place).
+
+Évalue l'impact sur la mission : foules, manifestations, présence policière renforcée, menaces, perturbations de circulation ou de transport, risques météo et technologiques, danger pour l'équipe.
 
 Règles strictes :
 - Utilise UNIQUEMENT les éléments ci-dessous. N'invente rien.
 - Ignore les articles hors sujet (résultats sportifs, nécrologies, homonymes d'autres villes, faits clos sans conséquence actuelle).
+- Ne place dans "a_venir" que des événements dont la date tombe le jour de la mission ou la veille, ou dont la date est incertaine mais plausible ; indique "date à confirmer" dans ce cas.
 - Chaque point cite les numéros d'articles [n] qui le fondent.
 - Si rien de significatif : niveau "vert" et précise que l'absence d'information ne garantit pas l'absence de risque.
 - Niveau : "vert" (RAS), "orange" (à intégrer au dispositif), "rouge" (mission à reconsidérer ou à adapter fortement).
 
-VIGILANCE MÉTÉO : ${vig}
+PRÉVISION MÉTÉO DU JOUR J : ${pv}
+VIGILANCE MÉTÉO DU JOUR J : ${vig}
 GÉORISQUES : ${geo}
 TRAINS : ${trains}
-PRESSE (7 jours) :
+PRESSE (catégorie, date de publication, titre) :
 ${presse}
 
 Réponds uniquement avec ce JSON, sans texte autour :
-{"niveau":"vert|orange|rouge","synthese":"2 à 3 phrases","points":[{"categorie":"...","texte":"...","refs":[1,2]}]}`;
+{"niveau":"vert|orange|rouge","synthese":"2 à 3 phrases centrées sur le jour J","a_venir":[{"quand":"date/heure ou 'date à confirmer'","quoi":"...","impact":"conséquence pour l'équipe","refs":[1]}],"contexte":[{"categorie":"...","texte":"...","refs":[2]}]}`;
 
   const r = await fetch('https://api.anthropic.com/v1/messages', {
     method: 'POST',
     headers: { 'x-api-key': env.ANTHROPIC_API_KEY, 'anthropic-version': '2023-06-01', 'content-type': 'application/json' },
-    body: JSON.stringify({ model: MODEL, max_tokens: 900, messages: [{ role: 'user', content: prompt }] })
+    body: JSON.stringify({ model: MODEL, max_tokens: 1400, messages: [{ role: 'user', content: prompt }] })
   });
   if (!r.ok) return { statut: 'indisponible (' + r.status + ')' };
   const j = await r.json();
@@ -337,5 +386,9 @@ Réponds uniquement avec ce JSON, sans texte autour :
   if (!m) return { statut: 'réponse illisible' };
   const o = JSON.parse(m[0]);
   const niveau = ['vert', 'orange', 'rouge'].includes(o.niveau) ? o.niveau : 'orange';
-  return { statut: 'ok', niveau, synthese: String(o.synthese || ''), points: Array.isArray(o.points) ? o.points.slice(0, 8) : [] };
+  return {
+    statut: 'ok', niveau, synthese: String(o.synthese || ''),
+    a_venir: Array.isArray(o.a_venir) ? o.a_venir.slice(0, 8) : [],
+    points: Array.isArray(o.contexte) ? o.contexte.slice(0, 6) : []
+  };
 }

@@ -188,6 +188,10 @@
   .situ-pt{font-size:13px;color:var(--text);margin-top:4px}
   .situ-keep{display:flex;gap:8px;align-items:center;font-size:12px;color:var(--gold-soft);margin-top:10px}
   .situ-keep input,.situ-it input{width:18px;height:18px;flex:0 0 auto;accent-color:#C6A15B}
+  .situ-wx{display:grid;grid-template-columns:1fr 1fr;gap:6px;font-size:13px}
+  .situ-wx div{background:var(--surface);border:1px solid var(--line);border-radius:7px;padding:7px 10px}
+  .situ-wx b{display:block;font-family:var(--mono);font-size:10px;color:var(--muted);font-weight:500}
+  .situ-av{border-left:3px solid #E0A030;padding:4px 0 4px 9px;margin-top:6px;font-size:13px}
   .situ-h{font-family:var(--mono);font-size:11px;color:var(--gold);letter-spacing:.5px;margin:14px 0 6px}
   .situ-cat{font-family:var(--sansc);font-weight:600;font-size:13px;color:var(--gold-soft);margin:10px 0 5px}
   .situ-chips{display:flex;flex-wrap:wrap;gap:6px}
@@ -341,6 +345,7 @@
       <button class="addbtn" id="addSec">+ Ajouter un secteur</button>
       <div class="situ">
         <div class="hint" style="margin-bottom:8px">SITUATION DU SECTEUR — météo, risques majeurs, trains, presse 7 jours, synthèse IA. Seul le code postal (ou le centre de la carte) est envoyé, jamais l'adresse ni la cible.</div>
+        <label class="f" style="margin-bottom:8px"><span class="lb">DATE DE LA MISSION (prévisions jusqu'à J+15)</span><input type="date" id="situDate"></label>
         <div class="situ-row">
           <input id="situCp" inputmode="numeric" maxlength="5" placeholder="Code postal">
           <button id="situBtn">Analyser</button>
@@ -769,8 +774,14 @@ var VLAB={1:'vert',2:'jaune',3:'orange',4:'rouge'};
 function fmtDate(d){ try{ var x=new Date(d); if(isNaN(x))return ''; return x.toLocaleDateString('fr-FR',{day:'2-digit',month:'2-digit'})+' '+x.toLocaleTimeString('fr-FR',{hour:'2-digit',minute:'2-digit'}); }catch(e){return '';} }
 function vigiList(d){
   var v=d&&d.vigilance; if(!v||v.statut!=='ok'||!v.periodes||!v.periodes.length) return [];
-  return (v.periodes[0].phenomenes||[]).filter(function(p){return p.couleur>=2;});
+  var per=null;
+  if(d.dateMission){ v.periodes.forEach(function(p){ if(p.date===d.dateMission) per=p; }); }
+  else per=v.periodes[0];
+  return per?(per.phenomenes||[]).filter(function(p){return p.couleur>=2;}):[];
 }
+function vigiPubliee(d){ var v=d&&d.vigilance; if(!v||v.statut!=='ok')return false; if(!d.dateMission)return true; return (v.periodes||[]).some(function(p){return p.date===d.dateMission;}); }
+function jourFR(iso){ if(!iso)return ''; var x=new Date(iso+'T12:00:00'); return isNaN(x)?iso:x.toLocaleDateString('fr-FR',{weekday:'short',day:'2-digit',month:'2-digit'}); }
+function pvTxt(pv){ return pv.temps+', '+pv.tmin+' à '+pv.tmax+' °C, pluie '+pv.pluie_mm+' mm'+(pv.pluie_proba!=null?' ('+pv.pluie_proba+' %)':'')+', rafales '+pv.rafales_kmh+' km/h · jour '+pv.lever+' → '+pv.coucher; }
 function situKept(){ return (S.situ.items||[]).filter(function(i){return i.keep;}); }
 function renderSitu(){
   var si=S.situ, d=si.data, box=$('situOut'); box.innerHTML='';
@@ -782,12 +793,22 @@ function renderSitu(){
   if(sy&&sy.statut==='ok'){
     var n=NIV[sy.niveau]||NIV.orange;
     h+='<div class="situ-card"><span class="situ-niv" style="background:'+n[0]+'">'+n[1]+'</span><div class="situ-syn">'+esc(sy.synthese)+'</div>';
+    (sy.a_venir||[]).forEach(function(a){ h+='<div class="situ-av"><b>'+esc(a.quand)+'</b> — '+esc(a.quoi)+(a.impact?'<div class="sm" style="color:var(--gold-soft)">→ '+esc(a.impact)+'</div>':'')+(a.refs&&a.refs.length?' <span class="sm">['+esc(a.refs.join(', '))+']</span>':'')+'</div>'; });
+    if(sy.a_venir&&!sy.a_venir.length) h+='<div class="situ-none" style="margin-top:4px">Aucun événement annoncé trouvé pour ce jour.</div>';
     (sy.points||[]).forEach(function(p){ h+='<div class="situ-pt"><b>'+esc(p.categorie)+'</b> — '+esc(p.texte)+(p.refs&&p.refs.length?' <span class="sm">['+esc(p.refs.join(', '))+']</span>':'')+'</div>'; });
     h+='<label class="situ-keep"><input type="checkbox" id="situKeepSyn"'+(si.keepSyn?' checked':'')+'> Inclure la synthèse dans le brief</label></div>';
   }
-  h+='<div class="situ-h">VIGILANCE MÉTÉO (aujourd\'hui)</div>';
+  var pv=d.prevision||{};
+  h+='<div class="situ-h">MÉTÉO PRÉVUE'+(d.dateMission?' — '+esc(jourFR(d.dateMission).toUpperCase()):'')+'</div>';
+  if(pv.statut==='ok'){
+    h+='<div class="situ-wx"><div><b>TEMPS</b>'+esc(pv.temps)+'</div><div><b>TEMPÉRATURES</b>'+pv.tmin+' à '+pv.tmax+' °C</div>';
+    h+='<div><b>PLUIE</b>'+esc(pv.pluie_mm)+' mm'+(pv.pluie_proba!=null?' · '+pv.pluie_proba+' %':'')+'</div><div><b>RAFALES</b>'+pv.rafales_kmh+' km/h</div>';
+    h+='<div><b>LEVER DU SOLEIL</b>'+esc(pv.lever)+'</div><div><b>COUCHER DU SOLEIL</b>'+esc(pv.coucher)+'</div></div>';
+  } else h+='<div class="situ-none">Prévision '+esc(pv.statut||'absente')+'.</div>';
+  h+='<div class="situ-h">VIGILANCE MÉTÉO-FRANCE</div>';
   var vg=vigiList(d);
-  if(d.vigilance&&d.vigilance.statut==='ok'){
+  if(d.vigilance&&d.vigilance.statut==='ok'&&!vigiPubliee(d)){ h+='<div class="situ-none">Pas encore publiée pour cette date (Météo-France la publie la veille).</div>'; }
+  else if(d.vigilance&&d.vigilance.statut==='ok'){
     if(vg.length){ h+='<div class="situ-chips">'; vg.forEach(function(p){ h+='<span style="border-color:'+VCOL[p.couleur]+';color:'+VCOL[p.couleur]+'">'+esc(p.nom)+' · '+VLAB[p.couleur]+'</span>'; }); h+='</div>'; }
     else h+='<div class="situ-none">Pas de vigilance particulière.</div>';
   } else h+='<div class="situ-none">Source '+esc(d.vigilance?d.vigilance.statut:'absente')+'.</div>';
@@ -802,7 +823,7 @@ function renderSitu(){
     if(t.perturbations&&t.perturbations.length) t.perturbations.forEach(function(p){ h+='<div class="situ-it2"><b>'+esc(p.gare)+'</b> — '+esc(p.effet||p.gravite)+(p.message?'<div class="sm">'+esc(p.message)+'</div>':'')+'</div>'; });
     else h+='<div class="situ-none">Aucune perturbation ('+esc((t.gares||[]).join(', '))+').</div>';
   } else h+='<div class="situ-none">Source '+esc(t.statut||'absente')+'.</div>';
-  h+='<div class="situ-h">PRESSE — 7 DERNIERS JOURS · coche ce qui sert à l\'équipe</div>';
+  h+='<div class="situ-h">PRESSE · « À venir » en premier · coche ce qui sert à l\'équipe</div>';
   if(!si.items.length) h+='<div class="situ-none">Rien trouvé — ne veut pas dire secteur calme.</div>';
   var last='';
   si.items.forEach(function(it,i){
@@ -825,6 +846,7 @@ function fetchSitu(fromMap){
   }
   if(SITU_URL.indexOf('REMPLACER')!==-1){ situErr('Relais pas encore branché : déploie le Worker Cloudflare puis colle son adresse dans SITU_URL.'); return; }
   $('situMsg').style.color=''; $('situMsg').textContent='Analyse en cours… (jusqu\'à 20 s)';
+  var dm=$('situDate').value; if(dm) q+='&date='+dm;
   fetch(SITU_URL+'/?'+q)
     .then(function(r){return r.json();})
     .then(function(j){
@@ -841,15 +863,20 @@ function situErr(m){ var e=$('situMsg'); e.textContent='⚠ '+m; e.style.color='
 function situLines(){
   var d=S.situ.data||{}, L=[], sy=d.synthese;
   if(S.situ.keepSyn&&sy&&sy.statut==='ok') L.push({niv:sy.niveau,t:sy.synthese});
+  if(S.situ.keepSyn&&sy&&sy.statut==='ok') (sy.a_venir||[]).forEach(function(a){ L.push({t:'À venir — '+a.quand+' : '+a.quoi+(a.impact?' → '+a.impact:'')}); });
   if(has(S.situ.note)) L.push({t:S.situ.note});
+  if(d.prevision&&d.prevision.statut==='ok') L.push({t:'Météo prévue : '+pvTxt(d.prevision)});
   vigiList(d).forEach(function(p){ L.push({t:'Vigilance météo '+VLAB[p.couleur]+' : '+p.nom}); });
   ((d.georisques||{}).seveso||[]).forEach(function(x){ L.push({t:'Site SEVESO : '+x.nom+(x.statut?' ('+x.statut+')':'')}); });
   ((d.sncf||{}).perturbations||[]).forEach(function(p){ L.push({t:'Trains — '+p.gare+' : '+(p.effet||p.gravite)+(p.message?' — '+p.message:'')}); });
   situKept().forEach(function(i){ L.push({t:i.titre+' ('+i.source+', '+fmtDate(i.date)+')'}); });
   return L;
 }
-function situHead(){ var d=S.situ.data||{}; return 'SITUATION DU SECTEUR'+(d.ville?' — '+d.ville:'')+(d.maj?' · maj '+fmtDate(d.maj):''); }
+function situHead(){ var d=S.situ.data||{}; return 'SITUATION DU SECTEUR'+(d.ville?' — '+d.ville:'')+(d.dateMission?' · pour le '+jourFR(d.dateMission):'')+(d.maj?' · maj '+fmtDate(d.maj):''); }
 $('situCp').value=S.situ.cp||'';
+(function(){ var t=new Date(); var iso=new Date(t.getTime()-t.getTimezoneOffset()*60000).toISOString().slice(0,10);
+  $('situDate').min=iso; $('situDate').value=(S.situ.date&&S.situ.date>=iso)?S.situ.date:iso; })();
+$('situDate').addEventListener('change',function(){ S.situ.date=$('situDate').value; save(); });
 $('situNote').value=S.situ.note||'';
 $('situNote').addEventListener('input',function(){ S.situ.note=$('situNote').value; save(); });
 $('situBtn').onclick=function(){fetchSitu(false);};
