@@ -94,7 +94,7 @@ export default {
         'Météo': vigilance.statut,
         'Géorisques': georisques.statut,
         'Trains': sncf.statut,
-        'Presse': presse.statut || 'ok',
+        'Presse': presse.statut || 'indisponible',
         'IA': synthese.statut
       }
     };
@@ -226,42 +226,68 @@ async function getSncf(lat, lon, env) {
 
 // ---------- 5. Presse locale classée par risque (Google Actualités, 7 jours) ----------
 async function getPresse(ville) {
-  const lists = await Promise.all(CATEGORIES.map(c => {
+  const diag = [];
+  // 1) Google Actualités (avec cookie de consentement pour éviter la page RGPD en Europe)
+  let lists = await Promise.all(CATEGORIES.map(c => {
     const q = '"' + ville + '"' + (c.q ? ' (' + c.q + ')' : '') + ' when:7d';
-    return gnews(q).catch(() => []);
+    return rss('https://news.google.com/rss/search?q=' + encodeURIComponent(q) + '&hl=fr&gl=FR&ceid=FR:fr', 'source');
   }));
+  let n = lists.reduce((a, l) => a + l.items.length, 0);
+  diag.push('Google ' + (n ? n : (lists[0].err || '0')));
+  // 2) Repli : Bing Actualités (7 derniers jours)
+  if (!n) {
+    lists = await Promise.all(CATEGORIES.map(c => {
+      const q = '"' + ville + '"' + (c.q ? ' (' + c.q + ')' : '');
+      return rss('https://www.bing.com/news/search?format=rss&setlang=fr-FR&cc=FR&qft=interval%3d%228%22&q=' + encodeURIComponent(q), 'News:Source');
+    }));
+    n = lists.reduce((a, l) => a + l.items.length, 0);
+    diag.push('Bing ' + (n ? n : (lists[0].err || '0')));
+  }
+  const limite = Date.now() - 8 * 86400000;
   const seen = new Set();
   const items = [];
-  lists.forEach((arr, i) => {
-    arr.slice(0, i === CATEGORIES.length - 1 ? 6 : 8).forEach(a => {
-      const k = a.titre.toLowerCase();
-      if (seen.has(k)) return;
-      seen.add(k);
-      items.push({ ...a, cat: CATEGORIES[i].label });
-    });
+  lists.forEach((l, i) => {
+    l.items.filter(a => { const t = Date.parse(a.date); return isNaN(t) || t >= limite; })
+      .slice(0, i === CATEGORIES.length - 1 ? 6 : 8).forEach(a => {
+        const k = a.titre.toLowerCase();
+        if (!a.titre || seen.has(k)) return;
+        seen.add(k);
+        items.push({ ...a, cat: CATEGORIES[i].label });
+      });
   });
-  return { statut: 'ok', items };
+  return { statut: items.length ? 'ok' : 'vide (' + diag.join(', ') + ')', items };
 }
-async function gnews(q) {
-  const r = await fetch('https://news.google.com/rss/search?q=' + encodeURIComponent(q) + '&hl=fr&gl=FR&ceid=FR:fr', {
-    headers: { 'User-Agent': 'Mozilla/5.0' }
-  });
-  const xml = await r.text();
-  const out = [];
-  const re = /<item>([\s\S]*?)<\/item>/g;
-  let m;
-  while ((m = re.exec(xml))) {
-    const b = m[1];
-    const get = t => {
-      const x = b.match(new RegExp('<' + t + '[^>]*>([\\s\\S]*?)<\\/' + t + '>'));
-      return x ? decode(x[1]) : '';
-    };
-    const source = get('source');
-    let titre = get('title');
-    if (source && titre.endsWith(' - ' + source)) titre = titre.slice(0, -(source.length + 3));
-    out.push({ titre, source, lien: get('link'), date: get('pubDate') });
+async function rss(url, sourceTag) {
+  try {
+    const r = await fetch(url, {
+      headers: {
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0 Safari/537.36',
+        'Accept': 'application/rss+xml, application/xml;q=0.9, */*;q=0.8',
+        'Accept-Language': 'fr-FR,fr;q=0.9',
+        'Cookie': 'CONSENT=YES+cb; SOCS=CAI'
+      }
+    });
+    if (!r.ok) return { items: [], err: 'HTTP ' + r.status };
+    const xml = await r.text();
+    if (xml.indexOf('<item') === -1) return { items: [], err: xml.indexOf('<rss') === -1 ? 'pas de flux' : '0' };
+    const out = [];
+    const re = /<item>([\s\S]*?)<\/item>/g;
+    let m;
+    while ((m = re.exec(xml))) {
+      const b = m[1];
+      const get = t => {
+        const x = b.match(new RegExp('<' + t + '[^>]*>([\\s\\S]*?)<\\/' + t + '>'));
+        return x ? decode(x[1]) : '';
+      };
+      const source = get(sourceTag);
+      let titre = get('title');
+      if (source && titre.endsWith(' - ' + source)) titre = titre.slice(0, -(source.length + 3));
+      out.push({ titre, source, lien: get('link'), date: get('pubDate') });
+    }
+    return { items: out };
+  } catch (e) {
+    return { items: [], err: 'erreur réseau' };
   }
-  return out;
 }
 
 // ---------- 6. Synthèse IA (Claude) ----------
