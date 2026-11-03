@@ -15,7 +15,8 @@
 
 const ALLOWED_ORIGINS = ['https://prkbrt362-lgtm.github.io'];
 const MODEL = 'claude-haiku-5-5';
-const AI_MODEL = '@cf/google/gemma-4-26b-a4b-it'; // modèle gratuit de Cloudflare (offre Workers Free)
+// Modèles gratuits de Cloudflare (offre Workers Free), essayés dans l'ordre
+const AI_MODELS = ['@cf/google/gemma-4-26b-a4b-it', '@cf/meta/llama-3.3-70b-instruct-fp8-fast', '@cf/zai-org/glm-4.7-flash'];
 const CACHE_SECONDS = 600; // 10 min : limite le coût et la charge sur les sources
 
 // Familles d'événements pouvant nuire au déroulé d'une mission (requête presse + filtre sur le titre)
@@ -134,7 +135,7 @@ function parisDate(d) {
   return d.toLocaleDateString('sv-SE', { timeZone: 'Europe/Paris' }); // AAAA-MM-JJ
 }
 async function safe(fn) {
-  try { return await fn(); } catch (e) { return { statut: 'indisponible' }; }
+  try { return await fn(); } catch (e) { return { statut: 'indisponible (' + String(e && e.message || e).slice(0, 60) + ')' }; }
 }
 function json(obj, status, headers) {
   return new Response(JSON.stringify(obj), {
@@ -205,44 +206,72 @@ function marqueJourJ(titre, pub, date) {
   if (ecart >= -0.5 && ecart <= 0.5 && /aujourd hui|ce matin|ce soir|en ce moment|actuellement/.test(t)) return true;
   return false;
 }
+const MOTS = 'grève OR préavis OR "mouvement social" OR perturbations OR manifestation OR rassemblement OR blocage OR cortège OR émeutes OR match OR concert OR festival OR salon OR foire OR marathon OR visite OR fermeture OR "route coupée" OR "circulation interdite" OR déviation OR travaux OR "arrêté préfectoral" OR évacuation OR attentat OR fusillade';
+const pause = ms => new Promise(r => setTimeout(r, ms));
+function classe(titre) {                       // famille d'après le titre, sinon null (= hors sujet)
+  const tl = titre.toLowerCase();
+  if (/nécrolog|obsèques|décès de|résultat du match|score|mercato|recette|horoscope|immobilier|restaurant/.test(tl)) return null;
+  for (const c of CATEGORIES) if (c.t.test(tl)) return c;
+  return null;
+}
 async function getPresse(ville, date) {
   const diag = [];
   const reseau = RESEAUX[ville];
-  const reqs = CATEGORIES.map(c => ({ c, q: '"' + ville + '" (' + c.q + ')' }));
-  if (reseau) reqs.push({ c: CATEGORIES[0], q: '"' + reseau + '" (grève OR préavis OR perturbations OR "mouvement social" OR "trafic perturbé")', reseau: true });
-  // 1) Google Actualités (cookie de consentement pour éviter la page RGPD en Europe)
-  let lists = await Promise.all(reqs.map(r =>
-    rss('https://news.google.com/rss/search?q=' + encodeURIComponent(r.q + ' when:' + r.c.days + 'd') + '&hl=fr&gl=FR&ceid=FR:fr', 'source')));
-  let n = lists.reduce((a, l) => a + l.items.length, 0);
-  diag.push('Google ' + (n ? n : (lists[0].err || '0')));
-  // 2) Repli : Bing Actualités
-  if (!n) {
-    lists = await Promise.all(reqs.map(r =>
-      rss('https://www.bing.com/news/search?format=rss&setlang=fr-FR&cc=FR&qft=interval%3d%229%22&q=' + encodeURIComponent(r.q), 'News:Source')));
-    n = lists.reduce((a, l) => a + l.items.length, 0);
-    diag.push('Bing ' + (n ? n : (lists[0].err || '0')));
+  const qVille = '"' + ville + '" (' + MOTS + ')';
+  const qRes = reseau ? '"' + reseau + '" (grève OR préavis OR perturbations OR "mouvement social" OR "trafic perturbé")' : '';
+  const brut = [];
+  // 1) Google Actualités — 2 requêtes l'une après l'autre (les rafales provoquent des refus 503)
+  for (const q of [qVille, qRes].filter(Boolean)) {
+    const u = 'https://news.google.com/rss/search?q=' + encodeURIComponent(q + ' when:21d') + '&hl=fr&gl=FR&ceid=FR:fr';
+    let r = await rss(u, 'source');
+    if (r.err && /HTTP 5|HTTP 429/.test(r.err)) { await pause(1500); r = await rss(u, 'source'); }
+    diag.push('Google ' + (r.items.length || r.err || '0'));
+    r.items.forEach(a => brut.push({ ...a, viaReseau: q === qRes }));
+  }
+  // 2) Repli : GDELT (base mondiale de presse, gratuite)
+  if (!brut.length) {
+    const g = await gdelt('(' + '"' + ville + '"' + (reseau ? ' OR "' + reseau + '"' : '') + ') (grève OR préavis OR manifestation OR rassemblement OR blocage OR match OR concert OR salon OR visite OR fermeture OR travaux OR déviation OR évacuation)');
+    diag.push('GDELT ' + (g.items.length || g.err || '0'));
+    g.items.forEach(a => brut.push(a));
+  }
+  // 3) Repli : Bing Actualités, requêtes simples
+  if (!brut.length) {
+    for (const q of [ville + ' grève', ville + ' manifestation', reseau ? reseau + ' grève' : ville + ' fermeture', ville + ' match concert']) {
+      const r = await rss('https://www.bing.com/news/search?format=rss&setlang=fr-FR&cc=FR&q=' + encodeURIComponent(q), 'News:Source');
+      r.items.forEach(a => brut.push(a));
+    }
+    diag.push('Bing ' + brut.length);
   }
   const seen = new Set();
   const items = [];
-  lists.forEach((l, i) => {
-    const { c, reseau: viaReseau } = reqs[i];
-    const limite = Date.now() - (c.days + 1) * 86400000;
-    l.items.forEach(a => {
-      if (!a.titre) return;
-      const t = Date.parse(a.date);
-      if (!isNaN(t) && t < limite) return;
-      const tl = a.titre.toLowerCase();
-      if (!c.t.test(tl)) return;                                     // titre hors sujet → écarté
-      if (/nécrolog|obsèques|décès de|résultat du match|score|mercato|recette|horoscope/.test(tl)) return;
-      const k = tl.replace(/[^a-z0-9àâçéèêëîïôûùüÿ]/g, '');
-      if (seen.has(k)) return;
-      seen.add(k);
-      items.push({ ...a, cat: c.label, jourJ: marqueJourJ(a.titre, a.date, date), viaReseau: !!viaReseau });
-    });
+  brut.forEach(a => {
+    if (!a.titre) return;
+    const c = classe(a.titre);
+    if (!c) return;
+    const t = Date.parse(a.date);
+    if (!isNaN(t) && t < Date.now() - (c.days + 1) * 86400000) return;
+    const k = a.titre.toLowerCase().replace(/[^a-z0-9àâçéèêëîïôûùüÿ]/g, '');
+    if (seen.has(k)) return;
+    seen.add(k);
+    items.push({ ...a, cat: c.label, jourJ: marqueJourJ(a.titre, a.date, date), viaReseau: !!a.viaReseau });
   });
-  // Jour J d'abord, puis les plus récents
   items.sort((x, y) => (y.jourJ - x.jourJ) || ((Date.parse(y.date) || 0) - (Date.parse(x.date) || 0)));
   return { statut: items.length ? 'ok' : 'rien trouvé (' + diag.join(', ') + ')', items: items.slice(0, 30), reseau: reseau || '' };
+}
+async function gdelt(q) {
+  try {
+    const u = 'https://api.gdeltproject.org/api/v2/doc/doc?mode=artlist&format=json&maxrecords=75&sort=datedesc&timespan=21d&query=' + encodeURIComponent(q + ' sourcelang:french');
+    const r = await fetch(u, { headers: { 'User-Agent': 'Mozilla/5.0 (compatible; situation-secteur)' } });
+    if (!r.ok) return { items: [], err: 'HTTP ' + r.status };
+    const txt = await r.text();
+    if (txt.trim()[0] !== '{') return { items: [], err: 'réponse non JSON' };
+    const j = JSON.parse(txt);
+    return { items: (j.articles || []).map(a => {
+      const d = String(a.seendate || '');
+      const iso = d.length >= 15 ? d.slice(0, 4) + '-' + d.slice(4, 6) + '-' + d.slice(6, 8) + 'T' + d.slice(9, 11) + ':' + d.slice(11, 13) + ':00Z' : '';
+      return { titre: a.title || '', source: a.domain || '', lien: a.url || '', date: iso };
+    }) };
+  } catch (e) { return { items: [], err: 'erreur' }; }
 }
 async function rss(url, sourceTag) {
   try {
@@ -350,18 +379,25 @@ Réponds uniquement avec ce JSON, sans texte autour :
     });
     if (r.ok) { const j = await r.json(); txt = (j.content || []).map(b => b.text || '').join(''); moteur = 'Claude'; }
   }
+  let erreur = '';
   if (!txt && env.AI) {                                   // IA gratuite Cloudflare (10 000 neurones/jour)
-    const o = await env.AI.run(AI_MODEL, { messages: [{ role: 'user', content: prompt }], max_tokens: 1400, temperature: 0.2 });
-    txt = typeof o === 'string' ? o
-      : (o && typeof o.response === 'string') ? o.response
-      : (o && o.response && typeof o.response === 'object') ? JSON.stringify(o.response)
-      : (o && o.choices && o.choices[0] && o.choices[0].message) ? (o.choices[0].message.content || '') : '';
-    moteur = 'Cloudflare';
+    for (const mdl of AI_MODELS) {
+      try {
+        const o = await env.AI.run(mdl, { messages: [{ role: 'user', content: prompt }], max_tokens: 1400, temperature: 0.2 });
+        txt = typeof o === 'string' ? o
+          : (o && typeof o.response === 'string') ? o.response
+          : (o && o.response && typeof o.response === 'object') ? JSON.stringify(o.response)
+          : (o && o.choices && o.choices[0] && o.choices[0].message) ? (o.choices[0].message.content || '') : '';
+        if (txt) { moteur = mdl.split('/').pop(); break; }
+        erreur = 'réponse vide';
+      } catch (e) { erreur = String(e && e.message || e).slice(0, 80); }
+    }
   }
-  if (!txt) return { statut: 'indisponible' };
+  if (!txt) return { statut: 'indisponible' + (erreur ? ' (' + erreur + ')' : '') };
   const m = txt.match(/\{[\s\S]*\}/);
   if (!m) return { statut: 'réponse illisible' };
-  const o = JSON.parse(m[0]);
+  let o;
+  try { o = JSON.parse(m[0]); } catch (e) { return { statut: 'réponse illisible (' + moteur + ')' }; }
   const niveau = ['vert', 'orange', 'rouge'].includes(o.niveau) ? o.niveau : 'orange';
   return {
     statut: 'ok', moteur, niveau, synthese: String(o.synthese || ''),
