@@ -838,9 +838,10 @@ function fetchSitu(fromMap){
     q='cp='+cp;
   }
   if(SITU_URL.indexOf('REMPLACER')!==-1){ situErr('Relais pas encore branché : déploie le Worker Cloudflare puis colle son adresse dans SITU_URL.'); return; }
-  $('situMsg').style.color=''; $('situMsg').textContent='Analyse en cours… (jusqu\'à 20 s)';
+  S.situ.data=null; S.situ.items=[]; save(); renderSitu();   // on efface l'ancienne analyse tout de suite
+  $('situMsg').style.color=''; $('situMsg').textContent='Analyse en cours… (jusqu\'à 30 s)';
   var dm=$('situDate').value; if(dm) q+='&date='+dm;
-  fetch(SITU_URL+'/?'+q)
+  fetch(SITU_URL+'/?'+q+'&t='+Date.now(),{cache:'no-store'})
     .then(function(r){return r.json();})
     .then(function(j){
       if(j.error){ situErr(j.error); return; }
