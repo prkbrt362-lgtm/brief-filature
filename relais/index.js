@@ -17,6 +17,7 @@ const ALLOWED_ORIGINS = ['https://prkbrt362-lgtm.github.io'];
 const MODEL = 'claude-haiku-5-5';
 // Modèles gratuits de Cloudflare (offre Workers Free), essayés dans l'ordre
 const AI_MODELS = ['@cf/google/gemma-4-26b-a4b-it', '@cf/meta/llama-3.3-70b-instruct-fp8-fast', '@cf/zai-org/glm-4.7-flash'];
+const CACHE_VERSION = 'v4'; // à changer à chaque évolution : invalide les anciens résultats
 const CACHE_SECONDS = 600; // 10 min : limite le coût et la charge sur les sources
 
 // Familles d'événements pouvant nuire au déroulé d'une mission (requête presse + filtre sur le titre)
@@ -78,7 +79,7 @@ export default {
     if (!byCp && !byLl) return json({ error: 'Code postal (5 chiffres) ou position requis' }, 400, cors);
 
     // Cache partagé : même secteur dans les 10 min = pas de nouvel appel aux sources
-    const cacheKey = new Request(url.origin + '/cache?' + (byCp ? 'cp=' + cp : 'll=' + lat.toFixed(3) + ',' + lon.toFixed(3)) + '&d=' + date);
+    const cacheKey = new Request(url.origin + '/cache-' + CACHE_VERSION + '?' + (byCp ? 'cp=' + cp : 'll=' + lat.toFixed(3) + ',' + lon.toFixed(3)) + '&d=' + date);
     const cache = caches.default;
     const hit = await cache.match(cacheKey);
     if (hit) return new Response(hit.body, { status: 200, headers: { ...Object.fromEntries(hit.headers), ...cors } });
@@ -125,7 +126,8 @@ export default {
       }
     };
     const resp = json(body, 200, cors);
-    ctx.waitUntil(cache.put(cacheKey, resp.clone()));
+    // On ne garde en mémoire que les analyses réussies (presse et IA ok)
+    if (presse.statut === 'ok' && synthese.statut === 'ok') ctx.waitUntil(cache.put(cacheKey, resp.clone()));
     return resp;
   }
 };
