@@ -172,6 +172,40 @@
   .pv-legend span{display:flex;align-items:center;gap:6px}
   .pv-legend i{width:12px;height:12px;border-radius:50%;display:inline-block}
   .pv-sec{display:flex;gap:11px;align-items:center;background:var(--surface);border:1px solid var(--line);border-left:3px solid var(--gold);border-radius:6px;padding:9px 12px;margin-top:7px}
+  .situ{margin-top:16px;padding-top:14px;border-top:1px dashed var(--line)}
+  .situ-row{display:flex;gap:8px}
+  .situ-row input{flex:1;min-width:0}
+  .situ-row button{flex:0 0 auto;background:var(--gold);color:var(--bg);border:none;border-radius:7px;font-weight:700;font-family:var(--sansc);font-size:14px;padding:0 14px;cursor:pointer}
+  .situ-row button.alt{background:var(--surface2);color:var(--gold-soft);border:1px solid var(--gold-deep)}
+  .situ-msg{font-family:var(--mono);font-size:11px;color:var(--muted);margin:8px 0}
+  .situ-src{display:flex;flex-wrap:wrap;gap:5px;margin-bottom:10px}
+  .situ-src span{font-family:var(--mono);font-size:10px;padding:2px 7px;border-radius:10px;border:1px solid var(--line)}
+  .situ-src .ok{color:var(--ok);border-color:#1e3a28}
+  .situ-src .ko{color:var(--muted2)}
+  .situ-card{background:var(--surface);border:1px solid var(--gold-deep);border-radius:8px;padding:12px;margin-bottom:6px}
+  .situ-niv,.pv-niv{display:inline-block;font-family:var(--sansc);font-weight:700;font-size:13px;letter-spacing:.5px;color:#080B14;padding:2px 10px;border-radius:4px;margin-bottom:6px}
+  .situ-syn{font-size:14px;margin-bottom:6px}
+  .situ-pt{font-size:13px;color:var(--text);margin-top:4px}
+  .situ-keep{display:flex;gap:8px;align-items:center;font-size:12px;color:var(--gold-soft);margin-top:10px}
+  .situ-keep input,.situ-it input{width:18px;height:18px;flex:0 0 auto;accent-color:#C6A15B}
+  .situ-wx{display:grid;grid-template-columns:1fr 1fr;gap:6px;font-size:13px}
+  .situ-wx div{background:var(--surface);border:1px solid var(--line);border-radius:7px;padding:7px 10px}
+  .situ-wx b{display:block;font-family:var(--mono);font-size:10px;color:var(--muted);font-weight:500}
+  .situ-av{border-left:3px solid #E0A030;padding:4px 0 4px 9px;margin-top:6px;font-size:13px}
+  .situ-jj{display:inline-block;background:#E0A030;color:#080B14;font-family:var(--sansc);font-weight:700;font-size:11px;letter-spacing:.5px;padding:1px 6px;border-radius:3px}
+  .situ-more{background:none;border:1px dashed var(--line);color:var(--muted);border-radius:7px;padding:8px;width:100%;font-size:12px;cursor:pointer;margin-top:4px}
+  .situ-h{font-family:var(--mono);font-size:11px;color:var(--gold);letter-spacing:.5px;margin:14px 0 6px}
+  .situ-cat{font-family:var(--sansc);font-weight:600;font-size:13px;color:var(--gold-soft);margin:10px 0 5px}
+  .situ-chips{display:flex;flex-wrap:wrap;gap:6px}
+  .situ-chips span{font-size:12px;font-weight:600;border:1px solid;border-radius:14px;padding:3px 10px}
+  .situ-none{font-size:13px;color:var(--muted2);font-style:italic}
+  .situ-it2{font-size:13px;background:var(--surface);border:1px solid var(--line);border-radius:7px;padding:8px 11px;margin-bottom:5px}
+  .situ-it{display:flex;gap:10px;align-items:flex-start;background:var(--surface);border:1px solid var(--line);border-radius:7px;padding:9px 11px;margin-bottom:6px;font-size:13px;cursor:pointer}
+  .situ .sm{font-family:var(--mono);font-size:10px;color:var(--muted);margin-top:2px}
+  .pv-situ{margin-top:12px;background:var(--bg2);border:1px solid var(--line);border-radius:6px;overflow:hidden}
+  .pv-situ .lh{font-family:var(--mono);font-size:11px;color:var(--gold);padding:9px 13px;border-bottom:1px solid var(--line)}
+  .pv-situ .si{padding:8px 13px;border-bottom:1px solid var(--line);font-size:14px}
+  .pv-situ .si:last-child{border-bottom:none}
   .pv-sec .sb{font-family:var(--sansc);font-weight:700;font-size:17px;color:var(--bg);background:var(--gold);width:28px;height:28px;border-radius:5px;display:flex;align-items:center;justify-content:center}
 
   /* ENVOYER */
@@ -311,6 +345,18 @@
       <div class="hint">La carte se prépare dans l'onglet <b>Carte</b> : place tes équipiers, la cible et les secteurs sur la photo satellite. Ajoute ici les secteurs pour la légende.</div>
       <div class="dyn" id="secList"></div>
       <button class="addbtn" id="addSec">+ Ajouter un secteur</button>
+      <div class="situ">
+        <div class="hint" style="margin-bottom:8px">SITUATION DU SECTEUR — météo du jour J et événements pouvant perturber la mission (grèves, manifs, foules, fermetures). Seul le code postal (ou le centre de la carte) est envoyé, jamais l'adresse ni la cible.</div>
+        <label class="f" style="margin-bottom:8px"><span class="lb">DATE DE LA MISSION (prévisions jusqu'à J+15)</span><input type="date" id="situDate"></label>
+        <div class="situ-row">
+          <input id="situCp" inputmode="numeric" maxlength="5" placeholder="Code postal">
+          <button id="situBtn">Analyser</button>
+          <button class="alt" id="situMapBtn">Centre carte</button>
+        </div>
+        <div class="situ-msg" id="situMsg"></div>
+        <div id="situOut"></div>
+        <label class="f" style="margin-top:12px"><span class="lb">NOTE DE SITUATION DU CHEF DE MISSION</span><textarea id="situNote" placeholder="Ce que l'équipe doit retenir"></textarea></label>
+      </div>
     </div>
 
     <div class="grp">
@@ -480,7 +526,8 @@ var DEF={
   comm1:'',comm2:'', lex:[], urgence:'',
   secu:[], logi:[],
   map:{center:[48.8566,2.3522],zoom:13,markers:[],sectors:[],layer:'ignsat'},
-  mapimg:null
+  mapimg:null,
+  situ:{cp:'',data:null,items:[],note:'',keepSyn:true}
 };
 var S;
 try{ S=JSON.parse(localStorage.getItem(KEY))||null; }catch(e){ S=null; }
@@ -488,6 +535,8 @@ if(!S){ S=JSON.parse(JSON.stringify(DEF)); seed(); }
 // ensure arrays exist
 ['tl','sec','eq','rule','lex','secu','logi'].forEach(function(k){ if(!Array.isArray(S[k])) S[k]=[]; });
 if(!S.map) S.map=JSON.parse(JSON.stringify(DEF.map));
+if(!S.situ||!Array.isArray(S.situ.items)) S.situ={cp:'',data:null,items:[],note:'',keepSyn:true};
+if(S.situ.data===undefined){ S.situ.data=null; S.situ.items=[]; S.situ.keepSyn=true; }
 
 function seed(){
   S.comm1='Signal — appel de groupe'; S.comm2='Conférence téléphonique';
@@ -719,6 +768,117 @@ function doReset(){
 $('resetBtn').onclick=doReset;
 $('btnResetSend').onclick=doReset;
 
+/* ---------- SITUATION DU SECTEUR ---------- */
+var SITU_URL='https://situation-secteur.prkbrt362.workers.dev'; // ← URL de ton Worker Cloudflare
+var NIV={vert:['#6FBF7A','RAS'],orange:['#E0A030','VIGILANCE'],rouge:['#D0574C','ALERTE']};
+var VCOL={1:'#6FBF7A',2:'#E8D44D',3:'#E0A030',4:'#D0574C'};
+var VLAB={1:'vert',2:'jaune',3:'orange',4:'rouge'};
+function fmtDate(d){ try{ var x=new Date(d); if(isNaN(x))return ''; return x.toLocaleDateString('fr-FR',{day:'2-digit',month:'2-digit'})+' '+x.toLocaleTimeString('fr-FR',{hour:'2-digit',minute:'2-digit'}); }catch(e){return '';} }
+function vigiList(d){
+  var v=d&&d.vigilance; if(!v||v.statut!=='ok'||!v.periodes||!v.periodes.length) return [];
+  var per=null;
+  if(d.dateMission){ v.periodes.forEach(function(p){ if(p.date===d.dateMission) per=p; }); }
+  else per=v.periodes[0];
+  return per?(per.phenomenes||[]).filter(function(p){return p.couleur>=2;}):[];
+}
+function vigiPubliee(d){ var v=d&&d.vigilance; if(!v||v.statut!=='ok')return false; if(!d.dateMission)return true; return (v.periodes||[]).some(function(p){return p.date===d.dateMission;}); }
+function jourFR(iso){ if(!iso)return ''; var x=new Date(iso+'T12:00:00'); return isNaN(x)?iso:x.toLocaleDateString('fr-FR',{weekday:'short',day:'2-digit',month:'2-digit'}); }
+function pvTxt(pv){ return pv.temps+', '+pv.tmin+' à '+pv.tmax+' °C, pluie '+pv.pluie_mm+' mm'+(pv.pluie_proba!=null?' ('+pv.pluie_proba+' %)':'')+', rafales '+pv.rafales_kmh+' km/h · jour '+pv.lever+' → '+pv.coucher; }
+function situKept(){ return (S.situ.items||[]).filter(function(i){return i.keep;}); }
+function renderSitu(){
+  var si=S.situ, d=si.data, box=$('situOut'); box.innerHTML='';
+  if(!d) return;
+  var h='';
+  $('situMsg').textContent=d.ville+' ('+(d.cp||'')+') · '+(d.departement||'')+' · maj '+fmtDate(d.maj);
+  h+='<div class="situ-src">'; Object.keys(d.sources||{}).forEach(function(k){ var st=d.sources[k]||'?'; h+='<span class="'+(st==='ok'?'ok':'ko')+'">'+esc(k)+' : '+esc(st)+'</span>'; }); h+='</div>';
+  var sy=d.synthese;
+  if(sy&&sy.statut==='ok'){
+    var n=NIV[sy.niveau]||NIV.orange;
+    h+='<div class="situ-card"><span class="situ-niv" style="background:'+n[0]+'">'+n[1]+'</span><div class="situ-syn">'+esc(sy.synthese)+'</div>';
+    (sy.a_venir||[]).forEach(function(a){ h+='<div class="situ-av"><b>'+esc(a.quand)+'</b> — '+esc(a.quoi)+(a.impact?'<div class="sm" style="color:var(--gold-soft)">→ '+esc(a.impact)+'</div>':'')+(a.refs&&a.refs.length?' <span class="sm">['+esc(a.refs.join(', '))+']</span>':'')+'</div>'; });
+    if(sy.a_venir&&!sy.a_venir.length) h+='<div class="situ-none" style="margin-top:4px">Aucun événement annoncé trouvé pour ce jour.</div>';
+    (sy.points||[]).forEach(function(p){ h+='<div class="situ-pt"><b>'+esc(p.categorie)+'</b> — '+esc(p.texte)+(p.refs&&p.refs.length?' <span class="sm">['+esc(p.refs.join(', '))+']</span>':'')+'</div>'; });
+    h+='<label class="situ-keep"><input type="checkbox" id="situKeepSyn"'+(si.keepSyn?' checked':'')+'> Inclure la synthèse dans le brief</label></div>';
+  }
+  var pv=d.prevision||{};
+  h+='<div class="situ-h">MÉTÉO PRÉVUE'+(d.dateMission?' — '+esc(jourFR(d.dateMission).toUpperCase()):'')+'</div>';
+  if(pv.statut==='ok'){
+    h+='<div class="situ-wx"><div><b>TEMPS</b>'+esc(pv.temps)+'</div><div><b>TEMPÉRATURES</b>'+pv.tmin+' à '+pv.tmax+' °C</div>';
+    h+='<div><b>PLUIE</b>'+esc(pv.pluie_mm)+' mm'+(pv.pluie_proba!=null?' · '+pv.pluie_proba+' %':'')+'</div><div><b>RAFALES</b>'+pv.rafales_kmh+' km/h</div>';
+    h+='<div><b>LEVER DU SOLEIL</b>'+esc(pv.lever)+'</div><div><b>COUCHER DU SOLEIL</b>'+esc(pv.coucher)+'</div></div>';
+  } else h+='<div class="situ-none">Prévision '+esc(pv.statut||'absente')+'.</div>';
+  h+='<div class="situ-h">VIGILANCE MÉTÉO-FRANCE</div>';
+  var vg=vigiList(d);
+  if(d.vigilance&&d.vigilance.statut==='ok'&&!vigiPubliee(d)){ h+='<div class="situ-none">Pas encore publiée pour cette date (Météo-France la publie la veille).</div>'; }
+  else if(d.vigilance&&d.vigilance.statut==='ok'){
+    if(vg.length){ h+='<div class="situ-chips">'; vg.forEach(function(p){ h+='<span style="border-color:'+VCOL[p.couleur]+';color:'+VCOL[p.couleur]+'">'+esc(p.nom)+' · '+VLAB[p.couleur]+'</span>'; }); h+='</div>'; }
+    else h+='<div class="situ-none">Pas de vigilance particulière.</div>';
+  } else h+='<div class="situ-none">Source '+esc(d.vigilance?d.vigilance.statut:'absente')+'.</div>';
+  h+='<div class="situ-h">ÉVÉNEMENTS POUVANT PERTURBER LA MISSION</div>';
+  var vis=si.items.filter(function(it){return !it.hide;}), cach=si.items.length-vis.length;
+  if(!vis.length) h+='<div class="situ-none">Aucun événement repéré — ne garantit pas un secteur calme.</div>';
+  si.items.forEach(function(it,i){
+    if(it.hide&&!si.showAll) return;
+    h+='<label class="situ-it'+(it.hide?'" style="opacity:.55':'')+'"><input type="checkbox" data-i="'+i+'"'+(it.keep?' checked':'')+'><div><div>'+(it.jourJ?'<span class="situ-jj">JOUR J</span> ':'')+'<span class="sm">['+(i+1)+']</span> '+esc(it.titre)+'</div><div class="sm">'+esc(it.cat)+' · '+esc(it.source)+' · '+esc(fmtDate(it.date))+'</div></div></label>';
+  });
+  if(cach) h+='<button type="button" class="situ-more" id="situMore">'+(si.showAll?'Masquer':'Afficher')+' les '+cach+' article'+(cach>1?'s':'')+' jugé'+(cach>1?'s':'')+' sans intérêt par l\'IA</button>';
+  box.innerHTML=h;
+  box.querySelectorAll('.situ-it input').forEach(function(c){ c.onchange=function(){ si.items[+c.dataset.i].keep=c.checked; save(); }; });
+  var mo=$('situMore'); if(mo) mo.onclick=function(){ si.showAll=!si.showAll; renderSitu(); };
+  var ks=$('situKeepSyn'); if(ks) ks.onchange=function(){ si.keepSyn=ks.checked; save(); };
+}
+function fetchSitu(fromMap){
+  var q;
+  if(fromMap){
+    var c=(LMAP?[LMAP.getCenter().lat,LMAP.getCenter().lng]:S.map.center);
+    q='lat='+(+c[0]).toFixed(5)+'&lon='+(+c[1]).toFixed(5);
+  } else {
+    var cp=$('situCp').value.trim();
+    if(!/^\d{5}$/.test(cp)){ $('situMsg').textContent='Code postal à 5 chiffres.'; return; }
+    q='cp='+cp;
+  }
+  if(SITU_URL.indexOf('REMPLACER')!==-1){ situErr('Relais pas encore branché : déploie le Worker Cloudflare puis colle son adresse dans SITU_URL.'); return; }
+  S.situ.data=null; S.situ.items=[]; save(); renderSitu();   // on efface l'ancienne analyse tout de suite
+  $('situMsg').style.color=''; $('situMsg').textContent='Analyse en cours… (jusqu\'à 30 s)';
+  var dm=$('situDate').value; if(dm) q+='&date='+dm;
+  fetch(SITU_URL+'/?'+q+'&t='+Date.now(),{cache:'no-store'})
+    .then(function(r){return r.json();})
+    .then(function(j){
+      if(j.error){ situErr(j.error); return; }
+      S.situ.cp=j.cp||''; $('situCp').value=S.situ.cp;
+      var ga=(j.synthese&&j.synthese.statut==='ok'&&Array.isArray(j.synthese.garder))?j.synthese.garder:null;
+      S.situ.items=(j.presse||[]).map(function(a,i){ var ok=ga?ga.indexOf(i+1)!==-1:true;
+        return {titre:a.titre,source:a.source,date:a.date,lien:a.lien,cat:a.cat,jourJ:!!a.jourJ,hide:!ok,keep:ok&&(!!a.jourJ||!!ga)}; });
+      S.situ.showAll=false;
+      delete j.presse;
+      S.situ.data=j; S.situ.keepSyn=true;
+      save(); renderSitu();
+    })
+    .catch(function(){ situErr('Relais injoignable (adresse SITU_URL, réseau ou fichier ouvert hors GitHub).'); });
+}
+function situErr(m){ var e=$('situMsg'); e.textContent='⚠ '+m; e.style.color='var(--danger)'; toast(m.length>60?'Analyse impossible — voir le message':m); }
+function situLines(){
+  var d=S.situ.data||{}, L=[], sy=d.synthese;
+  if(S.situ.keepSyn&&sy&&sy.statut==='ok') L.push({niv:sy.niveau,t:sy.synthese});
+  if(S.situ.keepSyn&&sy&&sy.statut==='ok') (sy.a_venir||[]).forEach(function(a){ L.push({t:'À venir — '+a.quand+' : '+a.quoi+(a.impact?' → '+a.impact:'')}); });
+  if(has(S.situ.note)) L.push({t:S.situ.note});
+  if(d.prevision&&d.prevision.statut==='ok') L.push({t:'Météo prévue : '+pvTxt(d.prevision)});
+  vigiList(d).forEach(function(p){ L.push({t:'Vigilance météo '+VLAB[p.couleur]+' : '+p.nom}); });
+  situKept().forEach(function(i){ L.push({t:(i.jourJ?'[JOUR J] ':'')+i.titre+' ('+i.source+', '+fmtDate(i.date)+')'}); });
+  return L;
+}
+function situHead(){ var d=S.situ.data||{}; return 'SITUATION DU SECTEUR'+(d.ville?' — '+d.ville:'')+(d.dateMission?' · pour le '+jourFR(d.dateMission):'')+(d.maj?' · maj '+fmtDate(d.maj):''); }
+$('situCp').value=S.situ.cp||'';
+(function(){ var t=new Date(); var iso=new Date(t.getTime()-t.getTimezoneOffset()*60000).toISOString().slice(0,10);
+  $('situDate').min=iso; $('situDate').value=(S.situ.date&&S.situ.date>=iso)?S.situ.date:iso; })();
+$('situDate').addEventListener('change',function(){ S.situ.date=$('situDate').value; save(); });
+$('situNote').value=S.situ.note||'';
+$('situNote').addEventListener('input',function(){ S.situ.note=$('situNote').value; save(); });
+$('situBtn').onclick=function(){fetchSitu(false);};
+$('situMapBtn').onclick=function(){fetchSitu(true);};
+$('situCp').addEventListener('keydown',function(e){ if(e.key==='Enter')fetchSitu(false); });
+renderSitu();
+
 /* ---------- TABS ---------- */
 var tabs=document.querySelectorAll('.tabbar button');
 tabs.forEach(function(b){
@@ -925,7 +1085,7 @@ function renderPreview(){
     h+='</div></div>';
   }
   // 04 ou
-  if(S.mapimg||S.sec.length){
+  if(S.mapimg||S.sec.length||situLines().length){
     h+='<div class="pv-block"><div class="pv-bh"><span class="n">04</span>OÙ — Carte & secteurs</div>';
     if(S.mapimg){
       h+='<div class="pv-mapimg"><img src="'+esc(S.mapimg.url)+'" alt="Carte" style="aspect-ratio:'+S.mapimg.W+'/'+S.mapimg.H+'">';
@@ -941,6 +1101,12 @@ function renderPreview(){
       h+='<p class="pv-empty">Carte non figée. Onglet Carte → « Figer la carte pour le brief ».</p>';
     }
     S.sec.forEach(function(s){ if(has(s.l)||has(s.d))h+='<div class="pv-sec"><span class="sb">'+esc(s.l)+'</span><span>'+esc(s.d)+'</span></div>'; });
+    var SL=situLines();
+    if(SL.length){
+      h+='<div class="pv-situ"><div class="lh">'+esc(situHead().toUpperCase())+'</div>';
+      SL.forEach(function(l){ var n=l.niv&&NIV[l.niv]; h+='<div class="si">'+(n?'<span class="pv-niv" style="background:'+n[0]+'">'+n[1]+'</span> ':'')+line(l.t)+'</div>'; });
+      h+='</div>';
+    }
     h+='</div>';
   }
   // 05 comment
@@ -1009,6 +1175,8 @@ function buildText(){
     L.push('');}
   if(S.tl.length){L.push('[QUAND]'); S.tl.forEach(function(t){if(has(t.h)||has(t.d))L.push('  '+(t.h||'')+' — '+(t.d||''));}); L.push('');}
   if(S.sec.length){L.push('[OÙ — SECTEURS]'); S.sec.forEach(function(s){if(has(s.l)||has(s.d))L.push('  '+(s.l||'')+' : '+(s.d||''));}); L.push('  (carte : voir PDF/image jointe)'); L.push('');}
+  var SLT=situLines();
+  if(SLT.length){ L.push('['+situHead()+']'); SLT.forEach(function(l){ L.push('  ▸ '+(l.niv?'['+(NIV[l.niv]||NIV.orange)[1]+'] ':'')+l.t); }); L.push(''); }
   if(S.eq.length){L.push('[COMMENT — DISPOSITIF]'); S.eq.forEach(function(e){L.push('  '+(e.ind?'['+e.ind+'] ':'')+(e.nom||'')+(e.role?' — '+e.role:'')+(e.secteur?' (sect. '+e.secteur+')':''));});
     S.rule.filter(has).forEach(function(r){L.push('  ▸ '+r);}); L.push('');}
   var cm=[]; if(has(S.comm1))cm.push('Principal: '+S.comm1); if(has(S.comm2))cm.push('Secours: '+S.comm2);

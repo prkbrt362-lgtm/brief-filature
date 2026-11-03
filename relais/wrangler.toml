@@ -4,8 +4,6 @@ main = "index.js"
 compatibility_date = "2026-10-01"
 
 [vars]
-# Mode test : autorise l'ouverture directe dans un navigateur. À retirer après l'essai.
-TEST_MODE = "1"
 
 # Les clés (METEOFRANCE_KEY, ANTHROPIC_API_KEY) se mettent en SECRETS
 # dans le tableau de bord Cloudflare (type « Secret »), jamais dans ce fichier public.
