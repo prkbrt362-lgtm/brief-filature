@@ -192,6 +192,8 @@
   .situ-wx div{background:var(--surface);border:1px solid var(--line);border-radius:7px;padding:7px 10px}
   .situ-wx b{display:block;font-family:var(--mono);font-size:10px;color:var(--muted);font-weight:500}
   .situ-av{border-left:3px solid #E0A030;padding:4px 0 4px 9px;margin-top:6px;font-size:13px}
+  .situ-jj{display:inline-block;background:#E0A030;color:#080B14;font-family:var(--sansc);font-weight:700;font-size:11px;letter-spacing:.5px;padding:1px 6px;border-radius:3px}
+  .situ-more{background:none;border:1px dashed var(--line);color:var(--muted);border-radius:7px;padding:8px;width:100%;font-size:12px;cursor:pointer;margin-top:4px}
   .situ-h{font-family:var(--mono);font-size:11px;color:var(--gold);letter-spacing:.5px;margin:14px 0 6px}
   .situ-cat{font-family:var(--sansc);font-weight:600;font-size:13px;color:var(--gold-soft);margin:10px 0 5px}
   .situ-chips{display:flex;flex-wrap:wrap;gap:6px}
@@ -344,7 +346,7 @@
       <div class="dyn" id="secList"></div>
       <button class="addbtn" id="addSec">+ Ajouter un secteur</button>
       <div class="situ">
-        <div class="hint" style="margin-bottom:8px">SITUATION DU SECTEUR — météo, risques majeurs, trains, presse 7 jours, synthèse IA. Seul le code postal (ou le centre de la carte) est envoyé, jamais l'adresse ni la cible.</div>
+        <div class="hint" style="margin-bottom:8px">SITUATION DU SECTEUR — météo du jour J et événements pouvant perturber la mission (grèves, manifs, foules, fermetures). Seul le code postal (ou le centre de la carte) est envoyé, jamais l'adresse ni la cible.</div>
         <label class="f" style="margin-bottom:8px"><span class="lb">DATE DE LA MISSION (prévisions jusqu'à J+15)</span><input type="date" id="situDate"></label>
         <div class="situ-row">
           <input id="situCp" inputmode="numeric" maxlength="5" placeholder="Code postal">
@@ -812,26 +814,17 @@ function renderSitu(){
     if(vg.length){ h+='<div class="situ-chips">'; vg.forEach(function(p){ h+='<span style="border-color:'+VCOL[p.couleur]+';color:'+VCOL[p.couleur]+'">'+esc(p.nom)+' · '+VLAB[p.couleur]+'</span>'; }); h+='</div>'; }
     else h+='<div class="situ-none">Pas de vigilance particulière.</div>';
   } else h+='<div class="situ-none">Source '+esc(d.vigilance?d.vigilance.statut:'absente')+'.</div>';
-  h+='<div class="situ-h">RISQUES MAJEURS DE LA COMMUNE</div>';
-  var g=d.georisques||{};
-  (g.seveso||[]).forEach(function(x){ h+='<div class="situ-it2"><b style="color:var(--danger)">SEVESO</b> '+esc(x.nom)+' <span class="sm">'+esc(x.statut)+'</span></div>'; });
-  if(g.risques&&g.risques.length) h+='<div style="font-size:13px">'+esc(g.risques.join(' · '))+'</div>';
-  if(!(g.seveso&&g.seveso.length)&&!(g.risques&&g.risques.length)) h+='<div class="situ-none">Aucune donnée ('+esc(g.statut||'absente')+').</div>';
-  h+='<div class="situ-h">TRAINS (gares proches)</div>';
-  var t=d.sncf||{};
-  if(t.statut==='ok'){
-    if(t.perturbations&&t.perturbations.length) t.perturbations.forEach(function(p){ h+='<div class="situ-it2"><b>'+esc(p.gare)+'</b> — '+esc(p.effet||p.gravite)+(p.message?'<div class="sm">'+esc(p.message)+'</div>':'')+'</div>'; });
-    else h+='<div class="situ-none">Aucune perturbation ('+esc((t.gares||[]).join(', '))+').</div>';
-  } else h+='<div class="situ-none">Source '+esc(t.statut||'absente')+'.</div>';
-  h+='<div class="situ-h">PRESSE · « À venir » en premier · coche ce qui sert à l\'équipe</div>';
-  if(!si.items.length) h+='<div class="situ-none">Rien trouvé — ne veut pas dire secteur calme.</div>';
-  var last='';
+  h+='<div class="situ-h">ÉVÉNEMENTS POUVANT PERTURBER LA MISSION</div>';
+  var vis=si.items.filter(function(it){return !it.hide;}), cach=si.items.length-vis.length;
+  if(!vis.length) h+='<div class="situ-none">Aucun événement repéré — ne garantit pas un secteur calme.</div>';
   si.items.forEach(function(it,i){
-    if(it.cat!==last){ h+='<div class="situ-cat">'+esc(it.cat)+'</div>'; last=it.cat; }
-    h+='<label class="situ-it"><input type="checkbox" data-i="'+i+'"'+(it.keep?' checked':'')+'><div><div><span class="sm">['+(i+1)+']</span> '+esc(it.titre)+'</div><div class="sm">'+esc(it.source)+' · '+esc(fmtDate(it.date))+'</div></div></label>';
+    if(it.hide&&!si.showAll) return;
+    h+='<label class="situ-it'+(it.hide?'" style="opacity:.55':'')+'"><input type="checkbox" data-i="'+i+'"'+(it.keep?' checked':'')+'><div><div>'+(it.jourJ?'<span class="situ-jj">JOUR J</span> ':'')+'<span class="sm">['+(i+1)+']</span> '+esc(it.titre)+'</div><div class="sm">'+esc(it.cat)+' · '+esc(it.source)+' · '+esc(fmtDate(it.date))+'</div></div></label>';
   });
+  if(cach) h+='<button type="button" class="situ-more" id="situMore">'+(si.showAll?'Masquer':'Afficher')+' les '+cach+' article'+(cach>1?'s':'')+' jugé'+(cach>1?'s':'')+' sans intérêt par l\'IA</button>';
   box.innerHTML=h;
   box.querySelectorAll('.situ-it input').forEach(function(c){ c.onchange=function(){ si.items[+c.dataset.i].keep=c.checked; save(); }; });
+  var mo=$('situMore'); if(mo) mo.onclick=function(){ si.showAll=!si.showAll; renderSitu(); };
   var ks=$('situKeepSyn'); if(ks) ks.onchange=function(){ si.keepSyn=ks.checked; save(); };
 }
 function fetchSitu(fromMap){
@@ -852,7 +845,10 @@ function fetchSitu(fromMap){
     .then(function(j){
       if(j.error){ situErr(j.error); return; }
       S.situ.cp=j.cp||''; $('situCp').value=S.situ.cp;
-      S.situ.items=(j.presse||[]).map(function(a){return {titre:a.titre,source:a.source,date:a.date,lien:a.lien,cat:a.cat,keep:false};});
+      var ga=(j.synthese&&j.synthese.statut==='ok'&&Array.isArray(j.synthese.garder))?j.synthese.garder:null;
+      S.situ.items=(j.presse||[]).map(function(a,i){ var ok=ga?ga.indexOf(i+1)!==-1:true;
+        return {titre:a.titre,source:a.source,date:a.date,lien:a.lien,cat:a.cat,jourJ:!!a.jourJ,hide:!ok,keep:ok&&(!!a.jourJ||!!ga)}; });
+      S.situ.showAll=false;
       delete j.presse;
       S.situ.data=j; S.situ.keepSyn=true;
       save(); renderSitu();
@@ -867,9 +863,7 @@ function situLines(){
   if(has(S.situ.note)) L.push({t:S.situ.note});
   if(d.prevision&&d.prevision.statut==='ok') L.push({t:'Météo prévue : '+pvTxt(d.prevision)});
   vigiList(d).forEach(function(p){ L.push({t:'Vigilance météo '+VLAB[p.couleur]+' : '+p.nom}); });
-  ((d.georisques||{}).seveso||[]).forEach(function(x){ L.push({t:'Site SEVESO : '+x.nom+(x.statut?' ('+x.statut+')':'')}); });
-  ((d.sncf||{}).perturbations||[]).forEach(function(p){ L.push({t:'Trains — '+p.gare+' : '+(p.effet||p.gravite)+(p.message?' — '+p.message:'')}); });
-  situKept().forEach(function(i){ L.push({t:i.titre+' ('+i.source+', '+fmtDate(i.date)+')'}); });
+  situKept().forEach(function(i){ L.push({t:(i.jourJ?'[JOUR J] ':'')+i.titre+' ('+i.source+', '+fmtDate(i.date)+')'}); });
   return L;
 }
 function situHead(){ var d=S.situ.data||{}; return 'SITUATION DU SECTEUR'+(d.ville?' — '+d.ville:'')+(d.dateMission?' · pour le '+jourFR(d.dateMission):'')+(d.maj?' · maj '+fmtDate(d.maj):''); }
