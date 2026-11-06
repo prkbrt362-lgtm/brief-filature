@@ -389,7 +389,7 @@ function renderPreview(){
   h+='<h1>'+(has(S.mission)?esc(S.mission):'MISSION')+'</h1>';
   h+='<div class="meta">';
   if(has(S.date))h+='<span>Date <b>'+esc(S.date)+'</b></span>';
-  h+='<span>Postes <b>'+S.postes.length+'</b></span></div>';
+  h+='</div>';
   var c=counts();
   h+='<div class="synth"><span class="s v"><span class="led"></span>'+c.v+'</span><span class="s o"><span class="led"></span>'+c.o+'</span><span class="s r"><span class="led"></span>'+c.r+'</span></div>';
   h+='</div>';
