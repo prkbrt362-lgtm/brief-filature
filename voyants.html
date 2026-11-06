@@ -100,6 +100,11 @@
   .pv-poste.v .st{color:var(--vert)} .pv-poste.o .st{color:var(--orange)} .pv-poste.r .st{color:var(--rouge)} .pv-poste .st.none{color:var(--muted2)}
   .pv-poste .rm{font-size:14px;color:var(--text);margin-top:7px;line-height:1.45}
   .pv-empty{color:var(--muted2);font-size:14px;font-style:italic;padding:30px 20px;text-align:center}
+  .pv-sechead{font-family:var(--mono);font-size:11px;letter-spacing:1px;color:var(--gold);margin-bottom:12px}
+  .pv-but{font-size:15px;line-height:1.5;color:var(--text);background:var(--surface);border:1px solid var(--line);border-left:3px solid var(--gold);border-radius:8px;padding:12px 14px}
+  .pv-day{display:flex;gap:12px;background:var(--surface);border:1px solid var(--line);border-radius:8px;padding:11px 13px;margin-bottom:8px}
+  .pv-daytag{font-family:var(--mono);font-weight:600;font-size:13px;color:var(--gold-soft);flex:0 0 auto;min-width:64px;padding-top:1px}
+  .pv-daytxt{font-size:14px;line-height:1.45;color:var(--text)}
 
   /* envoyer */
   .send{padding:20px 16px}
@@ -144,12 +149,20 @@
       <h2><span class="n">00</span>MISSION</h2>
       <div class="row2">
         <label class="f"><span class="lb">NOM DE LA MISSION</span><input id="f_mission" placeholder="Ex. Filature secteur nord"></label>
-        <label class="f"><span class="lb">DATE</span><input id="f_date" placeholder="Ex. 23 oct. 2026"></label>
+        <label class="f"><span class="lb">DATE / PÉRIODE</span><input id="f_date" placeholder="Ex. semaine du 23 oct. 2026"></label>
       </div>
+      <label class="f"><span class="lb">BUT DE LA SEMAINE</span><textarea id="f_but" placeholder="Résume en quelques lignes l'objectif de la semaine : ce qu'on cherchait à établir, le contexte, le livrable attendu."></textarea></label>
+    </div>
+
+    <div class="grp">
+      <h2><span class="n">01</span>CHRONOLOGIE<span class="countbadge" id="chronoCount">0</span></h2>
+      <div class="hint">Retrace l'enquête <b>jour par jour</b> : une ligne par journée (jour / date, puis ce qui s'est passé).</div>
+      <div class="dyn" id="chronoList"></div>
+      <button class="addbtn" id="addChrono">+ Ajouter un jour</button>
     </div>
 
     <div class="grp" style="border-bottom:none">
-      <h2><span class="n">01</span>POSTES<span class="countbadge" id="posteCount">0</span></h2>
+      <h2><span class="n">02</span>POSTES<span class="countbadge" id="posteCount">0</span></h2>
       <div class="hint">Pour chaque poste : un voyant <b style="color:var(--vert)">vert</b> (bon), <b style="color:var(--orange)">orange</b> (à travailler) ou <b style="color:var(--rouge)">rouge</b> (point d'attention), plus tes remarques. Le nom du poste est modifiable.</div>
       <div class="dyn" id="posteList"></div>
       <button class="addbtn" id="addPoste">+ Ajouter un poste</button>
@@ -239,17 +252,37 @@ function freshPostes(){return [
   {n:'Matériel',v:'',r:''},
   {n:'Compte rendu / livrable',v:'',r:''}
 ];}
-function DEF(){return {mission:'',date:'',postes:freshPostes()};}
+function DEF(){return {mission:'',date:'',but:'',chrono:[],postes:freshPostes()};}
 var S;
 try{ S=JSON.parse(localStorage.getItem(KEY))||null; }catch(e){ S=null; }
 if(!S){ S=DEF(); }
 if(!Array.isArray(S.postes)) S.postes=freshPostes();
+if(!Array.isArray(S.chrono)) S.chrono=[];
+if(typeof S.but!=='string') S.but='';
 
 var saveT;
 function save(){ try{localStorage.setItem(KEY,JSON.stringify(S));}catch(e){}
   var c=$('saveChip');c.textContent='enregistré ✓';clearTimeout(saveT);saveT=setTimeout(function(){c.textContent='enregistré';},1200); }
 
-['mission','date'].forEach(function(k){ var el=$('f_'+k); el.value=S[k]||''; el.addEventListener('input',function(){S[k]=el.value;save();}); });
+['mission','date','but'].forEach(function(k){ var el=$('f_'+k); el.value=S[k]||''; el.addEventListener('input',function(){S[k]=el.value;save();}); });
+
+function renderChrono(){
+  var box=$('chronoList'); box.innerHTML='';
+  S.chrono.forEach(function(it,i){
+    var d=document.createElement('div'); d.className='poste';
+    d.innerHTML='<div class="ptop"><input class="pname" placeholder="Jour / date (ex. Lun. 23)" value="'+esc(it.j)+'"><button class="del" title="Supprimer">&times;</button></div>'+
+      '<textarea class="rem" placeholder="Ce qui s\'est passé ce jour-là…">'+esc(it.d)+'</textarea>';
+    var jIn=d.querySelector('.pname'), dTa=d.querySelector('.rem');
+    jIn.oninput=function(){it.j=jIn.value;save();};
+    dTa.oninput=function(){it.d=dTa.value;save();};
+    d.querySelector('.del').onclick=function(){ S.chrono.splice(i,1); renderChrono(); save(); };
+    box.appendChild(d);
+  });
+  $('chronoCount').textContent=S.chrono.length;
+}
+$('addChrono').onclick=function(){ S.chrono.push({j:'',d:''}); renderChrono(); save();
+  var box=$('chronoList'); var ins=box.querySelectorAll('.pname'); if(ins.length)ins[ins.length-1].focus(); };
+renderChrono();
 
 var VLABEL={v:'Bon',o:'À travailler',r:"Point d'attention"};
 var VEMOJI={v:'🟢',o:'🟠',r:'🔴'};
@@ -312,7 +345,23 @@ function renderPreview(){
   h+='<div class="synth"><span class="s v"><span class="led"></span>'+c.v+'</span><span class="s o"><span class="led"></span>'+c.o+'</span><span class="s r"><span class="led"></span>'+c.r+'</span></div>';
   h+='</div>';
 
-  h+='<div class="pv-block">';
+  if(has(S.but)){
+    h+='<div class="pv-block"><div class="pv-sechead">BUT DE LA SEMAINE</div>';
+    h+='<div class="pv-but">'+line(S.but)+'</div></div>';
+  }
+
+  var chr=S.chrono.filter(function(x){return has(x.j)||has(x.d);});
+  if(chr.length){
+    h+='<div class="pv-block"><div class="pv-sechead">CHRONOLOGIE</div>';
+    chr.forEach(function(x){
+      h+='<div class="pv-day"><div class="pv-daytag">'+(has(x.j)?esc(x.j):'—')+'</div>';
+      if(has(x.d))h+='<div class="pv-daytxt">'+line(x.d)+'</div>';
+      h+='</div>';
+    });
+    h+='</div>';
+  }
+
+  h+='<div class="pv-block"><div class="pv-sechead">POSTES</div>';
   var any=false;
   S.postes.forEach(function(p){
     if(!has(p.n)&&!p.v&&!has(p.r))return; any=true;
@@ -337,6 +386,10 @@ function buildText(){
   var c=counts();
   L.push('Synthèse : '+VEMOJI.v+' '+c.v+'   '+VEMOJI.o+' '+c.o+'   '+VEMOJI.r+' '+c.r);
   L.push('');
+  if(has(S.but)){ L.push('[BUT DE LA SEMAINE]'); L.push(S.but); L.push(''); }
+  var chr=S.chrono.filter(function(x){return has(x.j)||has(x.d);});
+  if(chr.length){ L.push('[CHRONOLOGIE]'); chr.forEach(function(x){ L.push('• '+(has(x.j)?x.j:'—')+(has(x.d)?' : '+x.d:'')); }); L.push(''); }
+  L.push('[POSTES]');
   S.postes.forEach(function(p){
     if(!has(p.n)&&!p.v&&!has(p.r))return;
     var e=p.v?VEMOJI[p.v]:'⚪';
@@ -377,8 +430,7 @@ var _blob=null;
 function buildPWA(){try{
   var i192=makeIcon(192),i512=makeIcon(512);
   var base=location.href.split('#')[0].split('?')[0];
-  var scope=base.replace(/[^/]*$/,'');
-  var man={name:'Débriefing à voyants',short_name:'Débrief',start_url:base,scope:scope,display:'standalone',orientation:'portrait',background_color:'#080B14',theme_color:'#080B14',icons:[{src:i192,sizes:'192x192',type:'image/png',purpose:'any maskable'},{src:i512,sizes:'512x512',type:'image/png',purpose:'any maskable'}]};
+  var man={name:'Débriefing à voyants',short_name:'Débrief',id:base,start_url:base,scope:base,display:'standalone',orientation:'portrait',background_color:'#080B14',theme_color:'#080B14',icons:[{src:i192,sizes:'192x192',type:'image/png',purpose:'any maskable'},{src:i512,sizes:'512x512',type:'image/png',purpose:'any maskable'}]};
   if(_blob)URL.revokeObjectURL(_blob);
   _blob=URL.createObjectURL(new Blob([JSON.stringify(man)],{type:'application/manifest+json'}));
   $('manifestLink').setAttribute('href',_blob);$('appleIcon').setAttribute('href',i192);
